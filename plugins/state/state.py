@@ -1,5 +1,21 @@
 """
 State Plugin - Rules-read verification and mod statements
+
+This plugin allows moderators to post official moderation statements to channels.
+These statements can be posted anonymously (using server icon) or with the moderator's
+avatar, and can be targeted to specific channels. Useful for posting rules, warnings,
+or other official server communications.
+
+Commands:
+    !state [channel] <message> - Post a moderation statement
+
+Features:
+    - Anonymous or attributed moderation statements
+    - Channel targeting (can post to different channels)
+    - Automatic mention extraction and acknowledgment requests
+    - Distinctive formatting with "MOD STATEMENT" title
+    - Timestamped statements with unique IDs
+    - Permission-based access control
 """
 
 import logging

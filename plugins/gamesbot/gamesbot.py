@@ -1,5 +1,26 @@
 """
 GamesBot Plugin - Game tagging system
+
+This plugin allows users to tag themselves with games they play, making it easy
+for others to find and ping players interested in specific games. Users can add
+or remove game tags, view all available game tags, and ping everyone with a
+particular game tag.
+
+Commands:
+    !gamesbot add <game> - Add yourself to a game tag
+    !gamesbot remove <game> - Remove yourself from a game tag
+    !gamesbot list - List all game tags and member counts
+    !gamesbot ping <game> - Ping all members with a game tag
+    
+Shortcuts:
+    !gb - Alias for !gamesbot
+
+Features:
+    - Per-guild game tagging system
+    - Shows member count for each game tag
+    - Highlights games the user has tagged themselves with
+    - Easy ping functionality to find players
+    - Case-insensitive game matching
 """
 
 import logging
@@ -26,7 +47,7 @@ class GamesBot(PluginInterface, PluginHelper):
             EventListener.new()
             .add_command("gamesbot")
             .add_command("gamebot")
-            .add_command("gb")
+            .add_command("gb")  # Shortcut: !gb
             .set_callback(GamesBot.game_handler)
         )
     
@@ -58,7 +79,7 @@ class GamesBot(PluginInterface, PluginHelper):
     def get_help() -> str:
         """Get help text."""
         return (
-            "**Usage**: `!gamesbot (command) (argument)`\n\n"
+            "**Usage**: `!gamesbot (command) (argument)` or `!gb (command) (argument)`\n\n"
             "valid commands:\n"
             "- `add`: add yourself to a game\n"
             "- `remove`: remove yourself from a game\n"

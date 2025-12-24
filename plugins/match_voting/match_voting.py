@@ -1,5 +1,25 @@
 """
 MatchVoting Plugin - Match voting system
+
+This plugin provides a tournament-style match voting system. It allows creating
+matches with competitors, setting voting deadlines, and tallying votes. Useful
+for competitions, tournaments, or any scenario where you need structured voting
+with multiple options and deadlines.
+
+Commands:
+    !match create <title> [period] - Create a new match
+    !match addcompetitor <match_id> <user> [data] - Add a competitor
+    !match vote <match_id> <entry_id> - Vote for a competitor
+    !match announce <channel> <match_id> - Announce a match for voting
+    !tally <match_id> - View match results
+
+Features:
+    - Create matches with custom deadlines
+    - Add multiple competitors per match
+    - Vote tracking with deadline enforcement
+    - Detailed vote tallies (admin can see voter names)
+    - Match announcements with embed formatting
+    - Automatic vote expiration after deadline
 """
 
 import logging

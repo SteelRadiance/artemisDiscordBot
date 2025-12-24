@@ -1,5 +1,22 @@
 """
 Observer Plugin - Moderation logging and user reporting
+
+This plugin provides comprehensive moderation logging and user reporting functionality.
+It logs message deletions, member joins/leaves, invite creation, and handles user
+reports via reactions. All logs are sent to a configured monitoring channel.
+
+Commands:
+    !observer <channel_id> - Set monitoring channel
+    !observer <emote_id> - Set report emote
+
+Features:
+    - Message deletion logging with content and metadata
+    - Member join/leave tracking with roles and account info
+    - Invite creation monitoring
+    - User reporting via reaction (configurable emote)
+    - Per-guild configuration for monitoring channels
+    - Detailed embed formatting for all logged events
+    - Automatic reaction removal after reporting
 """
 
 import logging

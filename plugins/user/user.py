@@ -1,5 +1,22 @@
 """
 User Plugin - User information and utilities
+
+This plugin provides user information and utility commands. It displays detailed
+user profiles including roles, permissions, and account information. It also
+provides roster functionality to list members with specific roles.
+
+Commands:
+    !user [user] - Display user information
+    !roster <role> - List all members with a role
+    !av [user] - Get a user's avatar URL
+
+Features:
+    - Comprehensive user information display
+    - Role listing with IDs
+    - Permission display (guild and channel-level)
+    - Roster generation sorted by join date
+    - Avatar URL retrieval
+    - Formatted output with proper spacing
 """
 
 import logging

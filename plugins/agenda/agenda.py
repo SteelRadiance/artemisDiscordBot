@@ -1,5 +1,20 @@
 """
 Agenda Plugin - Staff motion/voting tally system
+
+This plugin provides a voting system for staff motions. It allows staff members to vote
+on proposals using reactions, and then tabulates the results including vote counts,
+quorum status, and tiebreaker logic. The plugin fires an 'agendaPluginConf' event that
+other plugins can listen to for custom voting configurations.
+
+Commands:
+    !agenda <message_url_or_id> - Tally votes from a message with reactions
+
+Features:
+    - Tracks votes from staff members based on role membership
+    - Supports multiple vote types (For, Against, Abstain, Absent)
+    - Calculates quorum requirements
+    - Handles tiebreaker roles for breaking ties
+    - Provides detailed vote breakdowns with voter names
 """
 
 import logging

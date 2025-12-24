@@ -1,5 +1,21 @@
 """
 AuditLog Plugin - Fetches and stores Discord audit log events
+
+This plugin continuously monitors Discord's audit log for all guilds the bot is in.
+It fetches audit log entries periodically and stores them persistently, allowing
+retrieval of moderation actions, role changes, channel modifications, and other
+server events even after they've expired from Discord's audit log.
+
+Commands:
+    !auditlog - Output all stored audit log events as JSON
+
+Features:
+    - Periodically fetches audit logs for all guilds (every 10 seconds)
+    - Stores entries persistently in JSON storage
+    - Respects Discord rate limits with intelligent throttling
+    - Tracks all audit log action types (bans, role changes, channel edits, etc.)
+    - Provides programmatic access to historical audit data
+    - Automatically handles rate limiting and retries
 """
 
 import logging

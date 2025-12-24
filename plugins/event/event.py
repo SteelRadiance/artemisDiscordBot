@@ -1,5 +1,22 @@
 """
 Event Plugin - Event calendar system
+
+This plugin provides a calendar system for scheduling and managing events within
+Discord servers. Users can create events with natural language time parsing,
+view upcoming events, and set up calendar channels that automatically update.
+
+Commands:
+    !event <when> <title> - Create a new event
+    !event remove <event_id> - Remove an event
+    !calendar - View upcoming events
+    !setCalendar <channel> - Set a channel to display calendar (auto-updates)
+
+Features:
+    - Natural language time parsing (e.g., "5 hours", "next tuesday", "2025-02-18")
+    - Timezone-aware scheduling using user's configured timezone
+    - Automatic calendar message updates every minute
+    - Displays events sorted by time with Discord timestamps
+    - Supports relative and absolute time formats
 """
 
 import logging

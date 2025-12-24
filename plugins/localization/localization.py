@@ -1,5 +1,22 @@
 """
 Localization Plugin - Internationalization and timezone management
+
+This plugin provides timezone and localization utilities for users. It allows
+users to set their timezone, which is then used by other plugins (like Event
+and Remind) to parse times correctly. It also provides time conversion
+utilities to help coordinate across different timezones.
+
+Commands:
+    !timezone [timezone] - Set or view your timezone
+    !time <time> - Convert a time to all timezones of users in the channel
+
+Features:
+    - Per-user timezone storage
+    - Uses standard timezone names (e.g., "America/New_York", "Europe/London")
+    - Automatic DST handling via pytz
+    - Time conversion for channel members
+    - Used by Event and Remind plugins for time parsing
+    - Supports all standard timezone identifiers
 """
 
 import logging

@@ -1,5 +1,23 @@
 """
 Role Plugin - Role self-management system
+
+This plugin allows users to self-assign roles through commands. Administrators can
+bind roles to be self-assignable, and users can toggle them on/off. The plugin also
+supports role inheritance, where having one role automatically grants another role.
+
+Commands:
+    !role [role_name] - Toggle a role (or list available roles)
+    !roles - List all self-assignable roles
+    !bindrole <role_id> - Make a role self-assignable (admin)
+    !inheritrole <source_role_id> <dest_role_id> - Set up role inheritance (admin)
+
+Features:
+    - Self-service role assignment
+    - Fuzzy matching for role names
+    - Role inheritance system (automatic role granting)
+    - Per-guild role binding
+    - Periodic inheritance checking (every 10 seconds)
+    - Permission-based access control
 """
 
 import logging

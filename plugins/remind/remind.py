@@ -1,5 +1,23 @@
 """
 Remind Plugin - Reminder system
+
+This plugin provides a personal reminder system. Users can set reminders that
+trigger at specified times, with support for natural language time parsing and
+timezone awareness. Reminders are stored persistently and checked periodically.
+
+Commands:
+    !remind <when> <message> - Set a reminder
+    !remind delete <reminder_id> - Delete a reminder
+    !rem / !remindme / !reminder - Aliases for !remind
+
+Features:
+    - Natural language time parsing (e.g., "5 hours", "next tuesday")
+    - Timezone-aware using user's configured timezone
+    - Persistent storage of reminders
+    - Automatic reminder delivery via DM or original channel
+    - Periodic checking every 10 seconds
+    - Reminder deletion by ID
+    - Links back to original message when possible
 """
 
 import logging

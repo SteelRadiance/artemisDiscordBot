@@ -1,5 +1,20 @@
 """
 Archive Plugin - Channel archiving tool
+
+This plugin allows administrators to archive entire Discord channels to JSON files.
+It captures all messages, attachments, user information, and metadata, storing them
+in a structured format. Large archives are automatically compressed with gzip.
+
+Commands:
+    !archive <channel_mention> - Archive a channel (admin only)
+
+Features:
+    - Exports all messages from a channel
+    - Preserves message metadata (author, timestamps, edits, pins)
+    - Captures attachment URLs and metadata
+    - Stores user information and avatars
+    - Automatically compresses large archives
+    - Admin-only due to resource usage
 """
 
 import logging

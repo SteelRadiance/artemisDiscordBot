@@ -1,5 +1,25 @@
 """
 Management Plugin - Bot management commands
+
+This plugin provides core bot administration commands including ping testing,
+bot information display, restart functionality, git updates, and invite link
+generation. It shows system statistics, loaded plugins, dependencies, and
+bot status information.
+
+Commands:
+    !ping - Test bot latency
+    !artemis - Display bot information and statistics
+    !restart - Restart the bot (admin only)
+    !update - Pull latest code from git (admin only)
+    !invite - Generate bot invite URL
+
+Features:
+    - Ping measurement using Discord snowflake timestamps
+    - Comprehensive bot info: memory, Python version, uptime, guild/channel counts
+    - Plugin listing with emoji-based version hashes
+    - Dependency version display
+    - Git integration for updates
+    - OAuth invite URL generation with proper permissions
 """
 
 import time

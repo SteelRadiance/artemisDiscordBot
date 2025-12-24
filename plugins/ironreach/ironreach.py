@@ -1,5 +1,20 @@
 """
 Ironreach Plugin - Ironreach server-specific features
+
+This plugin provides server-specific functionality for the Ironreach Discord server.
+It includes talking stick requests, voice channel naming, and custom agenda voting
+configuration.
+
+Commands:
+    !talkingstick - Request the talking stick (notifies staff)
+    !vc - Manually trigger voice channel name changes
+
+Features:
+    - Talking stick: Relays requests to staff channel
+    - Voice channel naming: Automatically renames empty voice channels with
+      random track names from a data file
+    - Agenda integration: Provides custom voting configuration for the agenda plugin
+    - Server-specific: Only active on the Ironreach guild
 """
 
 import logging
@@ -18,8 +33,6 @@ class Ironreach(PluginInterface, PluginHelper):
     """Ironreach plugin for server-specific features."""
     
     COMREP_ROLE = 766785052163571734
-    JURY_CHANNEL = 769771967606947840
-    JURY_ROLE = 769772066371010590
     IRONREACH_GUILD_ID = 673383165943087115
     
     @staticmethod
@@ -30,13 +43,6 @@ class Ironreach(PluginInterface, PluginHelper):
             return
         
         # Only register for specific guild
-        bot.eventManager.addEventListener(
-            EventListener.new()
-            .add_command("jury")
-            .add_guild(Ironreach.IRONREACH_GUILD_ID)
-            .set_callback(Ironreach.jury)
-        )
-        
         bot.eventManager.addEventListener(
             EventListener.new()
             .add_command("talkingstick")
@@ -163,38 +169,5 @@ class Ironreach(PluginInterface, PluginHelper):
             
             await data.message.channel.send("Your request to get the Talking Stick has been relayed to staff.")
             await data.message.delete()
-        except Exception as e:
-            await Ironreach.exception_handler(data.message, e)
-    
-    @staticmethod
-    async def jury(data):
-        """Handle jury command."""
-        try:
-            args = Ironreach.split_command(data.message.content)
-            if len(args) < 2:
-                await data.message.reply("Usage: `!jury <user>`")
-                return
-            
-            user_text = " ".join(args[1:])
-            member = Ironreach.parse_guild_user(data.guild, user_text)
-            
-            if not member:
-                await data.message.reply("Could not find that user.")
-                return
-            
-            jury_channel = data.guild.get_channel(Ironreach.JURY_CHANNEL)
-            jury_role = data.guild.get_role(Ironreach.JURY_ROLE)
-            
-            if not jury_channel or not jury_role:
-                await data.message.reply("Jury system not configured.")
-                return
-            
-            # Add jury role
-            try:
-                await member.add_roles(jury_role, reason="Added via jury command")
-                await jury_channel.send(f"{member.mention} has been added to the jury.")
-                await data.message.reply(f"{member.display_name} has been added to the jury.")
-            except Exception as e:
-                await data.message.reply(f"Failed to add {member.display_name} to jury: {e}")
         except Exception as e:
             await Ironreach.exception_handler(data.message, e)

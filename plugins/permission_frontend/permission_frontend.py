@@ -1,5 +1,24 @@
 """
 PermissionFrontend Plugin - Frontend for managing permissions via commands
+
+This plugin provides a command-line interface for managing bot permissions. It allows
+checking permission status, adding permissions with various scopes (global, guild,
+channel), and targeting different entities (users, roles, admins). Permissions can
+be allowed or denied at different levels.
+
+Commands:
+    !permission check <permission> [user] - Check if a user has a permission
+    !permission add <permission> [options] - Add a permission
+    !perm - Alias for !permission
+    !hpm - Alias for !permission
+
+Features:
+    - Permission checking with detailed results
+    - Multi-scope permissions (global, guild, channel)
+    - Multiple target types (users, roles, admins, bot owners)
+    - Allow/deny permission control
+    - Permission modification permission checks
+    - Stores permissions persistently
 """
 
 import logging
