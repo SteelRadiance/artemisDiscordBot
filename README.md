@@ -55,7 +55,3 @@ Monitors and stores Discord audit log events (`!auditlog`)
 
 - [Usage Guide](USAGE_GUIDE.md) - Complete guide for server admins
 - [Configuration](config/config.example.py) - Configuration examples
-
-## License
-
-MIT
