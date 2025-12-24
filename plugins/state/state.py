@@ -1,4 +1,6 @@
 """
+Copyright 2025, Vijay Challa - Use of this source code follows the MIT license found in the LICENSE file.
+
 State Plugin - Rules-read verification and mod statements
 
 This plugin allows moderators to post official moderation statements to channels.

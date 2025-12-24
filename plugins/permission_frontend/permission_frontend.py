@@ -1,4 +1,6 @@
 """
+Copyright 2025, Vijay Challa - Use of this source code follows the MIT license found in the LICENSE file.
+
 PermissionFrontend Plugin - Frontend for managing permissions via commands
 
 This plugin provides a command-line interface for managing bot permissions. It allows

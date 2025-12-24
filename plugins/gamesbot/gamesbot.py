@@ -1,4 +1,6 @@
 """
+Copyright 2025, Vijay Challa - Use of this source code follows the MIT license found in the LICENSE file.
+
 GamesBot Plugin - Game tagging system
 
 This plugin allows users to tag themselves with games they play, making it easy

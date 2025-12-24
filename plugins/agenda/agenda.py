@@ -1,4 +1,6 @@
 """
+Copyright 2025, Vijay Challa - Use of this source code follows the MIT license found in the LICENSE file.
+
 Agenda Plugin - Staff motion/voting tally system
 
 This plugin provides a voting system for staff motions. It allows staff members to vote

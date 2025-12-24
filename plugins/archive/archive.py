@@ -1,4 +1,6 @@
 """
+Copyright 2025, Vijay Challa - Use of this source code follows the MIT license found in the LICENSE file.
+
 Archive Plugin - Channel archiving tool
 
 This plugin allows administrators to archive entire Discord channels to JSON files.

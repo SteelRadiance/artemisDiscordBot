@@ -1,4 +1,6 @@
 """
+Copyright 2025, Vijay Challa - Use of this source code follows the MIT license found in the LICENSE file.
+
 Role Plugin - Role self-management system
 
 This plugin allows users to self-assign roles through commands. Administrators can

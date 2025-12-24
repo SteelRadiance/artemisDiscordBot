@@ -1,4 +1,6 @@
 """
+Copyright 2025, Vijay Challa - Use of this source code follows the MIT license found in the LICENSE file.
+
 Observer Plugin - Moderation logging and user reporting
 
 This plugin provides comprehensive moderation logging and user reporting functionality.

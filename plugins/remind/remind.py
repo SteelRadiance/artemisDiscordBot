@@ -1,4 +1,6 @@
 """
+Copyright 2025, Vijay Challa - Use of this source code follows the MIT license found in the LICENSE file.
+
 Remind Plugin - Reminder system
 
 This plugin provides a personal reminder system. Users can set reminders that

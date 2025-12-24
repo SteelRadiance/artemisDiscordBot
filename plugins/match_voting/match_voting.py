@@ -1,4 +1,6 @@
 """
+Copyright 2025, Vijay Challa - Use of this source code follows the MIT license found in the LICENSE file.
+
 MatchVoting Plugin - Match voting system
 
 This plugin provides a tournament-style match voting system. It allows creating

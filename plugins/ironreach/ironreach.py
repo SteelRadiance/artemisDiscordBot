@@ -1,4 +1,6 @@
 """
+Copyright 2025, Vijay Challa - Use of this source code follows the MIT license found in the LICENSE file.
+
 Ironreach Plugin - Ironreach server-specific features
 
 This plugin provides server-specific functionality for the Ironreach Discord server.

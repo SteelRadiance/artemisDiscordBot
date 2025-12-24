@@ -1,4 +1,6 @@
 """
+Copyright 2025, Vijay Challa - Use of this source code follows the MIT license found in the LICENSE file.
+
 User Plugin - User information and utilities
 
 This plugin provides user information and utility commands. It displays detailed

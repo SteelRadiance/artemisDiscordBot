@@ -1,4 +1,6 @@
 """
+Copyright 2025, Vijay Challa - Use of this source code follows the MIT license found in the LICENSE file.
+
 Localization Plugin - Internationalization and timezone management
 
 This plugin provides timezone and localization utilities for users. It allows

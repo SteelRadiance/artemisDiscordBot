@@ -1,4 +1,6 @@
 """
+Copyright 2025, Vijay Challa - Use of this source code follows the MIT license found in the LICENSE file.
+
 AuditLog Plugin - Fetches and stores Discord audit log events
 
 This plugin continuously monitors Discord's audit log for all guilds the bot is in.
