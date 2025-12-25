@@ -63,36 +63,42 @@ class Management(PluginInterface, PluginHelper):
             EventListener.new()
             .add_command("ping")
             .set_callback(Management.ping)
+            .set_help("**Usage**: `!ping`\n\nTests bot latency by measuring response time.")
         )
         
         bot.eventManager.add_listener(
             EventListener.new()
             .add_command("artemis")
             .set_callback(Management.info)
+            .set_help("**Usage**: `!artemis`\n\nDisplays bot information including memory usage, Python version, uptime, guild/channel counts, loaded plugins, and dependencies.")
         )
         
         bot.eventManager.add_listener(
             EventListener.new()
             .add_command("restart")
             .set_callback(Management.restart)
+            .set_help("**Usage**: `!restart`\n\nRestarts the bot. (Admin only)")
         )
         
         bot.eventManager.add_listener(
             EventListener.new()
             .add_command("update")
             .set_callback(Management.update)
+            .set_help("**Usage**: `!update`\n\nPulls the latest code from git. (Admin only)")
         )
         
         bot.eventManager.add_listener(
             EventListener.new()
             .add_command("invite")
             .set_callback(Management.invite)
+            .set_help("**Usage**: `!invite`\n\nGenerates a bot invite URL with the required permissions.")
         )
         
         bot.eventManager.add_listener(
             EventListener.new()
             .add_command("help")
             .set_callback(Management.help)
+            .set_help("**Usage**: `!help`\n\nLists all commands available to you, organized by category with descriptions.")
         )
         
         bot.eventManager.add_listener(
@@ -310,7 +316,6 @@ class Management(PluginInterface, PluginHelper):
                 "role": ("p.roles.toggle", True, "Toggle a role or list available roles", "Role"),
                 "roles": ("p.roles.list", True, "List all self-assignable roles", "Role"),
                 "bindrole": ("p.roles.bind", False, "Make a role self-assignable (admin)", "Role"),
-                "inheritrole": ("p.roles.bind", False, "Set up role inheritance (admin)", "Role"),
                 
                 "remind": (None, True, "Set a reminder (use !remind delete <id> to remove)", "Remind"),
                 "rem": (None, True, "Set a reminder (short)", "Remind"),

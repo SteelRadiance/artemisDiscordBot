@@ -4,7 +4,7 @@ Copyright 2025, Vijay Challa - Use of this source code follows the MIT license f
 EventListener class for registering event handlers
 """
 
-from typing import Callable, Optional, Any
+from typing import Callable, Optional, Any, Union
 from dataclasses import dataclass
 
 
@@ -18,6 +18,7 @@ class EventListener:
     periodic: Optional[int] = None  # Interval in seconds
     callback: Optional[Callable] = None
     guild_id: Optional[int] = None  # Optional guild ID filter
+    help_text: Optional[Union[str, Callable]] = None  # Help text or callable returning help text
     
     @classmethod
     def new(cls) -> "EventListener":
@@ -47,4 +48,9 @@ class EventListener:
     def add_guild(self, guild_id: int) -> "EventListener":
         """Add a guild ID filter (command will only work in this guild)."""
         self.guild_id = guild_id
+        return self
+    
+    def set_help(self, help_text: Union[str, Callable]) -> "EventListener":
+        """Set help text for the command (string or callable returning string)."""
+        self.help_text = help_text
         return self

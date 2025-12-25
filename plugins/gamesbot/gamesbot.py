@@ -45,13 +45,13 @@ class GamesBot(PluginInterface, PluginHelper):
             bot.log.info("Not adding gamesbot commands on testing.")
             return
         
-        bot.eventManager.add_listener(
-            EventListener.new()
-            .add_command("gamesbot")
-            .add_command("gamebot")
-            .add_command("gb")
-            .set_callback(GamesBot.game_handler)
-        )
+        for cmd in ["gamesbot", "gamebot", "gb"]:
+            bot.eventManager.add_listener(
+                EventListener.new()
+                .add_command(cmd)
+                .set_callback(GamesBot.game_handler)
+                .set_help(GamesBot.get_help)
+            )
     
     @staticmethod
     async def game_handler(data):

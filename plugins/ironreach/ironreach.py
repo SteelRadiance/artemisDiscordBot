@@ -49,6 +49,7 @@ class Ironreach(PluginInterface, PluginHelper):
             .add_command("talkingstick")
             .add_guild(Ironreach.IRONREACH_GUILD_ID)
             .set_callback(Ironreach.talkingstick)
+            .set_help("**Usage**: `!talkingstick`\n\nRequest the talking stick in the Ironreach guild.")
         )
         
         bot.eventManager.add_listener(
@@ -56,6 +57,7 @@ class Ironreach(PluginInterface, PluginHelper):
             .add_command("vc")
             .add_guild(Ironreach.IRONREACH_GUILD_ID)
             .set_callback(Ironreach.voice_chat)
+            .set_help("**Usage**: `!vc`\n\nChange voice channel name in the Ironreach guild. Requires permission `p.ironreach.changevc`.")
         )
         
         bot.eventManager.add_listener(

@@ -46,6 +46,7 @@ class State(PluginInterface, PluginHelper):
             EventListener.new()
             .add_command("state")
             .set_callback(State.process)
+            .set_help("**Usage**: `!state [channel] <message>`\n\nPost a moderation statement. If a channel is specified, posts to that channel; otherwise posts to the current channel. Requires permission `p.moderation.state`.")
         )
     
     @staticmethod

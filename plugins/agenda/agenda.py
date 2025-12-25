@@ -55,6 +55,7 @@ class Agenda(PluginInterface, PluginHelper):
             EventListener.new()
             .add_command("agenda")
             .set_callback(Agenda.agenda_tally_handler)
+            .set_help("**Usage**: `!agenda <message_url_or_id>`\n\nTally votes from a message with reactions. Counts votes from staff members based on configured vote types (For, Against, Abstain, Absent) and provides a detailed breakdown including quorum status.")
         )
         
         # Register event listener for configuration

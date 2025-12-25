@@ -72,6 +72,7 @@ class AuditLog(PluginInterface, PluginHelper):
             EventListener.new()
             .add_command("auditlog")
             .set_callback(AuditLog.output_audit_logs)
+            .set_help("**Usage**: `!auditlog`\n\nView audit log entries. The log is sent via DM and contains records of moderation actions and other logged events.")
         )
     
     @staticmethod

@@ -5,7 +5,7 @@ EventManager for handling Discord events, commands, and periodic tasks
 """
 
 import asyncio
-from typing import Dict, List, Callable, Optional
+from typing import Dict, List, Callable, Optional, Union
 import logging
 
 from artemis.events.listener import EventListener
@@ -25,7 +25,8 @@ class EventManager:
         """
         self.bot = bot
         self.event_listeners: Dict[str, List[Callable]] = {}
-        self.command_listeners: Dict[str, List[tuple]] = {}  # List of (callback, guild_id) tuples
+        self.command_listeners: Dict[str, List[tuple]] = {}  # List of (callback, guild_id, help_text) tuples
+        self.command_help: Dict[str, Union[str, Callable]] = {}  # Command name -> help text/callable
         self.periodic_tasks: List[tuple] = []  # List of (interval, callback) tuples
         self._periodic_task_handles: List[asyncio.Task] = []
     
@@ -47,8 +48,11 @@ class EventManager:
             if listener.command not in self.command_listeners:
                 self.command_listeners[listener.command] = []
             if listener.callback:
-                # Store callback with guild_id filter (None if no filter)
-                self.command_listeners[listener.command].append((listener.callback, listener.guild_id))
+                # Store callback with guild_id filter (None if no filter) and help text
+                self.command_listeners[listener.command].append((listener.callback, listener.guild_id, listener.help_text))
+                # Store help text if provided (overwrites previous if multiple listeners for same command)
+                if listener.help_text:
+                    self.command_help[listener.command] = listener.help_text
                 logger.info(f"Registered command listener: {listener.command}" + 
                            (f" (guild: {listener.guild_id})" if listener.guild_id else ""))
         
@@ -75,23 +79,33 @@ class EventManager:
                 except Exception as e:
                     logger.error(f"Error in event listener for {event_name}: {e}", exc_info=True)
     
-    async def dispatch_command(self, command: str, *args, **kwargs) -> None:
+    async def dispatch_command(self, command: str, parsed_args: Optional[list] = None, *args, **kwargs) -> None:
         """
         Dispatch a command to all registered listeners.
         
         Args:
             command: Command name
-            *args: Command arguments
+            parsed_args: Parsed command arguments (for checking -help flag)
+            *args: Command arguments (EventData)
             **kwargs: Command keyword arguments
         """
         logger.info(f"Dispatching command: '{command}', available commands: {sorted(self.command_listeners.keys())}")
+        
+        # Check for -help flag
+        if parsed_args and "-help" in parsed_args:
+            await self._handle_help(command, args[0] if args else None)
+            return
+        
         if command in self.command_listeners:
             # Extract guild from EventData if present
             guild_id = None
             if args and hasattr(args[0], 'guild') and args[0].guild:
                 guild_id = args[0].guild.id
             
-            for callback, filter_guild_id in self.command_listeners[command]:
+            for callback_tuple in self.command_listeners[command]:
+                callback = callback_tuple[0]
+                filter_guild_id = callback_tuple[1] if len(callback_tuple) > 1 else None
+                
                 # Skip if guild filter doesn't match
                 if filter_guild_id is not None and guild_id != filter_guild_id:
                     logger.debug(f"Skipping command {command} due to guild filter: {filter_guild_id} != {guild_id}")
@@ -106,6 +120,39 @@ class EventManager:
                     logger.error(f"Error in command listener for {command}: {e}", exc_info=True)
         else:
             logger.warning(f"Command '{command}' not found in registered commands: {sorted(self.command_listeners.keys())}")
+    
+    async def _handle_help(self, command: str, event_data) -> None:
+        """
+        Handle help request for a command.
+        
+        Args:
+            command: Command name
+            event_data: EventData object with message
+        """
+        if not event_data or not hasattr(event_data, 'message'):
+            return
+        
+        help_text = None
+        
+        # Get help text from registered help
+        if command in self.command_help:
+            help_source = self.command_help[command]
+            if isinstance(help_source, str):
+                help_text = help_source
+            elif callable(help_source):
+                try:
+                    if asyncio.iscoroutinefunction(help_source):
+                        help_text = await help_source()
+                    else:
+                        help_text = help_source()
+                except Exception as e:
+                    logger.error(f"Error calling help function for {command}: {e}")
+        
+        # Send help message
+        if help_text:
+            await event_data.message.reply(help_text)
+        else:
+            await event_data.message.reply(f"No help available for command `{command}`.")
     
     def start_periodic_tasks(self) -> None:
         """Start all registered periodic tasks."""

@@ -50,12 +50,14 @@ class MatchVoting(PluginInterface, PluginHelper):
             EventListener.new()
             .add_command("match")
             .set_callback(MatchVoting.match_handler)
+            .set_help(MatchVoting.get_help)
         )
         
         bot.eventManager.add_listener(
             EventListener.new()
             .add_command("tally")
             .set_callback(MatchVoting.tally_handler)
+            .set_help("**Usage**: `!tally <match_id>`\n\nView match voting results for a specific match. Shows vote counts and winners.")
         )
     
     @staticmethod

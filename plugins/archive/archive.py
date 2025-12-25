@@ -48,6 +48,7 @@ class Archive(PluginInterface, PluginHelper):
             EventListener.new()
             .add_command("archive")
             .set_callback(Archive.archive)
+            .set_help("**Usage**: `!archive <channel_mention>`\n\nArchive a channel. This command is admin only.")
         )
     
     @staticmethod

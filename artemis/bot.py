@@ -127,7 +127,7 @@ class ArtemisBot(commands.Bot):
                 artemis=self
             )
             
-            await self.eventManager.dispatch_command(parsed.command, event_data)
+            await self.eventManager.dispatch_command(parsed.command, parsed.args, event_data)
         else:
             logger.debug(f"Message did not parse as command: {message.content}")
         

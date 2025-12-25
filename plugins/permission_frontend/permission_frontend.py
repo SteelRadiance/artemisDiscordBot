@@ -56,13 +56,13 @@ class PermissionFrontend(PluginInterface, PluginHelper):
             bot.log.info("Not adding permission frontend commands on testing.")
             return
         
-        bot.eventManager.add_listener(
-            EventListener.new()
-            .add_command("permission")
-            .add_command("perm")
-            .add_command("hpm")
-            .set_callback(PermissionFrontend.hpm)
-        )
+        for cmd in ["permission", "perm", "hpm"]:
+            bot.eventManager.add_listener(
+                EventListener.new()
+                .add_command(cmd)
+                .set_callback(PermissionFrontend.hpm)
+                .set_help(PermissionFrontend.get_help)
+            )
     
     @staticmethod
     async def hpm(data):

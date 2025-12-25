@@ -47,12 +47,14 @@ class Localization(PluginInterface, PluginHelper):
             EventListener.new()
             .add_command("time")
             .set_callback(Localization.time_helper)
+            .set_help("**Usage**: `!time <time_string>`\n\nConvert a time string to all configured timezones. Useful for scheduling across different timezones.")
         )
         
         bot.eventManager.add_listener(
             EventListener.new()
             .add_command("timezone")
             .set_callback(Localization.timezone)
+            .set_help("**Usage**: `!timezone [timezone]`\n\nSet or view your timezone. If a timezone is provided, it will be saved for use in other commands like `!remind`. Use timezone names from [this list](https://www.php.net/manual/en/timezones.php).")
         )
     
     @staticmethod

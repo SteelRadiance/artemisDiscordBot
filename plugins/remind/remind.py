@@ -44,14 +44,13 @@ class Remind(PluginInterface, PluginHelper):
             bot.log.info("Not adding remind commands on testing.")
             return
         
-        bot.eventManager.add_listener(
-            EventListener.new()
-            .add_command("rem")
-            .add_command("remind")
-            .add_command("remindme")
-            .add_command("reminder")
-            .set_callback(Remind.remind_me)
-        )
+        for cmd in ["rem", "remind", "remindme", "reminder"]:
+            bot.eventManager.add_listener(
+                EventListener.new()
+                .add_command(cmd)
+                .set_callback(Remind.remind_me)
+                .set_help(Remind.get_help)
+            )
         
         bot.eventManager.add_listener(
             EventListener.new()

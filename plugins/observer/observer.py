@@ -46,6 +46,7 @@ class Observer(PluginInterface, PluginHelper):
             EventListener.new()
             .add_command("observer")
             .set_callback(Observer.config)
+            .set_help("**Usage**: `!observer`\n\nConfigure moderation logging settings. This command is admin only. The observer plugin automatically logs message deletions, member joins/leaves, and other moderation events.")
         )
         
         # Register Discord events

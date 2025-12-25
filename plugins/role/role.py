@@ -4,21 +4,17 @@ Copyright 2025, Vijay Challa - Use of this source code follows the MIT license f
 Role Plugin - Role self-management system
 
 This plugin allows users to self-assign roles through commands. Administrators can
-bind roles to be self-assignable, and users can toggle them on/off. The plugin also
-supports role inheritance, where having one role automatically grants another role.
+bind roles to be self-assignable, and users can toggle them on/off.
 
 Commands:
     !role [role_name] - Toggle a role (or list available roles)
     !roles - List all self-assignable roles
     !bindrole <role_id> - Make a role self-assignable (admin)
-    !inheritrole <source_role_id> <dest_role_id> - Set up role inheritance (admin)
 
 Features:
     - Self-service role assignment
     - Fuzzy matching for role names
-    - Role inheritance system (automatic role granting)
     - Per-guild role binding
-    - Periodic inheritance checking (every 10 seconds)
     - Permission-based access control
 """
 
@@ -44,30 +40,20 @@ class Role(PluginInterface, PluginHelper):
             bot.log.info("Not adding role commands on testing.")
             return
         
-        bot.eventManager.add_listener(
-            EventListener.new()
-            .add_command("role")
-            .add_command("roles")
-            .set_callback(Role.role_entry)
-        )
+        role_help = "**Usage**: `!role [role_name]` or `!roles`\n\nToggle a self-assignable role on/off. If no role is specified or you use `!roles`, lists all available self-assignable roles. Requires permission `p.roles.toggle`."
+        for cmd in ["role", "roles"]:
+            bot.eventManager.add_listener(
+                EventListener.new()
+                .add_command(cmd)
+                .set_callback(Role.role_entry)
+                .set_help(role_help)
+            )
         
         bot.eventManager.add_listener(
             EventListener.new()
             .add_command("bindrole")
             .set_callback(Role.role_bind)
-        )
-        
-        bot.eventManager.add_listener(
-            EventListener.new()
-            .add_command("inheritrole")
-            .set_callback(Role.role_inherit)
-        )
-        
-        # Periodic task for inheritance
-        bot.eventManager.add_listener(
-            EventListener.new()
-            .set_periodic(10)
-            .set_callback(Role.poll_inheritance)
+            .set_help("**Usage**: `!bindrole <role_id>`\n\nMake a role self-assignable by users. Requires admin permissions.")
         )
     
     @staticmethod
@@ -235,87 +221,3 @@ class Role(PluginInterface, PluginHelper):
         except Exception as e:
             await Role.exception_handler(data.message, e, True)
     
-    @staticmethod
-    async def role_inherit(data):
-        """Set up role inheritance."""
-        try:
-            p = Permission("p.roles.bind", data.artemis, False)
-            p.add_message_context(data.message)
-            if not await p.resolve():
-                await p.send_unauthorized_message(data.message.channel)
-                return
-            
-            args = Role.split_command(data.message.content)
-            if len(args) < 3:
-                await Role.error(data.message, "Error", "Usage: `!inheritrole SOURCE_ROLE_ID DEST_ROLE_ID`.")
-                return
-            
-            source_id = int(args[1]) if args[1].isdigit() else None
-            dest_id = int(args[2]) if args[2].isdigit() else None
-            
-            if not source_id or not dest_id:
-                await Role.error(data.message, "Error", "Usage: `!inheritrole SOURCE_ROLE_ID DEST_ROLE_ID`.")
-                return
-            
-            source = data.guild.get_role(source_id)
-            dest = data.guild.get_role(dest_id)
-            
-            if not source or not dest:
-                await Role.error(data.message, "Error", "One or both roles not found.")
-                return
-            
-            if source.id == data.guild.id or dest.id == data.guild.id:
-                await Role.error(data.message, "Error", "`@everyone` is not a bindable role!")
-                return
-            
-            # Store inheritance
-            try:
-                await data.artemis.storage.set("roles_inherit", f"{data.guild.id}_{source_id}_{dest_id}", {
-                    "guild_id": str(data.guild.id),
-                    "source_role_id": str(source_id),
-                    "dest_role_id": str(dest_id)
-                })
-                await data.message.reply(f"Role added to server role inheritance: Having `@{source.name}` will add `@{dest.name}`.")
-            except Exception as e:
-                await Role.exception_handler(data.message, e, True)
-        except Exception as e:
-            await Role.exception_handler(data.message, e, True)
-    
-    @staticmethod
-    async def poll_inheritance(bot):
-        """Periodically check and apply role inheritance."""
-        try:
-            if Role.is_testing_client(bot):
-                return
-            
-            # Get all inheritance rules
-            inheritances = await bot.storage.get_all("roles_inherit")
-            
-            for key, value in inheritances.items():
-                if not isinstance(value, dict):
-                    continue
-                
-                guild_id = int(value.get("guild_id", 0))
-                source_id = int(value.get("source_role_id", 0))
-                dest_id = int(value.get("dest_role_id", 0))
-                
-                guild = bot.get_guild(guild_id)
-                if not guild:
-                    continue
-                
-                source_role = guild.get_role(source_id)
-                dest_role = guild.get_role(dest_id)
-                
-                if not source_role or not dest_role:
-                    continue
-                
-                # Find members with source role but not dest role
-                for member in guild.members:
-                    if source_role in member.roles and dest_role not in member.roles:
-                        try:
-                            await member.add_roles(dest_role, reason=f"Inherited from role {source_role.name}")
-                            logger.debug(f"{member.display_name} inherits {dest_role.name} from {source_role.name}")
-                        except Exception as e:
-                            logger.warning(f"Failed to add inherited role: {e}")
-        except Exception as e:
-            logger.error(f"Error in poll_inheritance: {e}")

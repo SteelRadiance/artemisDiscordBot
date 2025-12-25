@@ -47,18 +47,21 @@ class User(PluginInterface, PluginHelper):
             EventListener.new()
             .add_command("user")
             .set_callback(User.process)
+            .set_help("**Usage**: `!user [user]`\n\nDisplay detailed user information including ID, username, nickname, roles, permissions, and account creation date. If no user is specified, shows your own information.")
         )
         
         bot.eventManager.add_listener(
             EventListener.new()
             .add_command("roster")
             .set_callback(User.roster)
+            .set_help("**Usage**: `!roster <role>`\n\nList all members with a specific role, sorted by join date. Requires permission `p.userutils.roster`.")
         )
         
         bot.eventManager.add_listener(
             EventListener.new()
             .add_command("av")
             .set_callback(User.av)
+            .set_help("**Usage**: `!av [user]`\n\nGet a user's avatar URL. If no user is specified, shows your own avatar.")
         )
     
     @staticmethod
