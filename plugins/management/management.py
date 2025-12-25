@@ -212,7 +212,50 @@ class Management(PluginInterface, PluginHelper):
             return
         
         await data.message.channel.send("🃏🔫")
-        sys.exit(1)
+        
+        # Get the path to main.py (project root)
+        project_root = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
+        main_script = os.path.join(project_root, "main.py")
+        
+        # Get Python executable
+        python_exe = sys.executable
+        
+        try:
+            # Set environment variable to indicate this is a restart
+            env = os.environ.copy()
+            env['ARTEMIS_RESTART'] = '1'
+            
+            # Spawn a new process to restart the bot
+            if os.name == 'nt':  # Windows
+                # On Windows, use CREATE_NEW_CONSOLE to spawn in a new console window
+                subprocess.Popen(
+                    [python_exe, main_script],
+                    cwd=project_root,
+                    env=env,
+                    creationflags=subprocess.CREATE_NEW_CONSOLE,
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL
+                )
+            else:  # Unix-like systems
+                # On Unix, detach the process so it continues after parent exits
+                subprocess.Popen(
+                    [python_exe, main_script],
+                    cwd=project_root,
+                    env=env,
+                    start_new_session=True,
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL
+                )
+        except Exception as e:
+            logger.error(f"Failed to restart bot: {e}")
+            await data.message.channel.send(f"❌ Failed to restart: {str(e)}")
+            return
+        
+        # Give the new process a moment to start
+        time.sleep(0.5)
+        
+        # Exit the current process
+        sys.exit(0)
     
     @staticmethod
     async def update(data):
