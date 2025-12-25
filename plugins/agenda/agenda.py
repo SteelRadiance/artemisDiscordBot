@@ -51,14 +51,14 @@ class Agenda(PluginInterface, PluginHelper):
             bot.log.info("Not adding agenda commands on testing.")
             return
         
-        bot.eventManager.addEventListener(
+        bot.eventManager.add_listener(
             EventListener.new()
             .add_command("agenda")
             .set_callback(Agenda.agenda_tally_handler)
         )
         
         # Register event listener for configuration
-        bot.eventManager.addEventListener(
+        bot.eventManager.add_listener(
             EventListener.new()
             .add_event("agendaPluginConf")
             .set_callback(Agenda.handle_config_event)

@@ -30,7 +30,6 @@ import disnake
 
 from artemis.plugin.base import PluginInterface, PluginHelper
 from artemis.events.listener import EventListener
-from artemis.permissions.resolver import Permission
 
 logger = logging.getLogger("artemis.plugin.auditlog")
 
@@ -61,7 +60,7 @@ class AuditLog(PluginInterface, PluginHelper):
             return
         
         # Register ready event to load from storage
-        bot.eventManager.addEventListener(
+        bot.eventManager.add_listener(
             EventListener.new()
             .add_event("ready")
             .set_callback(lambda bot_instance: asyncio.create_task(AuditLog.load_from_storage(bot_instance)))
@@ -69,14 +68,14 @@ class AuditLog(PluginInterface, PluginHelper):
         
         # Periodic task to fetch new audit log entries (every 10 seconds)
         # This fetches as often as Discord's API allows while respecting rate limits
-        bot.eventManager.addEventListener(
+        bot.eventManager.add_listener(
             EventListener.new()
             .set_periodic(10)  # 10 seconds - fetch as often as possible
             .set_callback(AuditLog.fetch_audit_logs)
         )
         
         # Command to output all events as JSON
-        bot.eventManager.addEventListener(
+        bot.eventManager.add_listener(
             EventListener.new()
             .add_command("auditlog")
             .set_callback(AuditLog.output_audit_logs)
@@ -174,6 +173,60 @@ class AuditLog(PluginInterface, PluginHelper):
             logger.error(f"Error in fetch_audit_logs: {e}", exc_info=True)
     
     @staticmethod
+    def _extract_changes(entry: disnake.AuditLogEntry) -> List[Dict[str, Any]]:
+        """
+        Extract changes from an audit log entry.
+        
+        In disnake, AuditLogEntry has:
+        - entry.before: AuditLogDiff (iterable, yields (key, value) tuples)
+        - entry.after: AuditLogDiff (iterable, yields (key, value) tuples)
+        - entry.changes: AuditLogChanges (not directly iterable)
+        
+        Args:
+            entry: Audit log entry
+            
+        Returns:
+            List of change dictionaries with 'key', 'old_value', 'new_value'
+        """
+        changes = []
+        
+        try:
+            # Build dictionaries from before and after states
+            before_dict = {}
+            after_dict = {}
+            
+            # Iterate over before state (AuditLogDiff is iterable)
+            if entry.before:
+                for key, value in entry.before:
+                    before_dict[key] = value
+            
+            # Iterate over after state (AuditLogDiff is iterable)
+            if entry.after:
+                for key, value in entry.after:
+                    after_dict[key] = value
+            
+            # Combine all keys from both before and after
+            all_keys = set(before_dict.keys()) | set(after_dict.keys())
+            
+            # Create change entries
+            for key in all_keys:
+                old_value = before_dict.get(key)
+                new_value = after_dict.get(key)
+                
+                changes.append({
+                    'key': key,
+                    'old_value': str(old_value) if old_value is not None else None,
+                    'new_value': str(new_value) if new_value is not None else None,
+                })
+        
+        except Exception as e:
+            # Log any errors but don't crash
+            logger.debug(f"Error extracting changes from audit log entry {entry.id}: {e}")
+            return []
+        
+        return changes
+    
+    @staticmethod
     async def fetch_guild_audit_logs(bot, guild: disnake.Guild):
         """
         Fetch audit logs for a specific guild.
@@ -208,24 +261,7 @@ class AuditLog(PluginInterface, PluginHelper):
                         'action': entry.action.name if hasattr(entry.action, 'name') else str(entry.action),
                         'action_type': entry.action.value if hasattr(entry.action, 'value') else None,
                         'reason': entry.reason,
-                        'changes': [
-                            {
-                                'key': change.key,
-                                'old_value': str(change.old_value) if change.old_value is not None else None,
-                                'new_value': str(change.new_value) if change.new_value is not None else None,
-                            }
-                            for change in (entry.changes or [])
-                        ],
-                        'options': {
-                            'type': entry.options.type.name if entry.options and entry.options.type else None,
-                            'id': str(entry.options.id) if entry.options and entry.options.id else None,
-                            'role_name': entry.options.role_name if entry.options else None,
-                            'count': entry.options.count if entry.options else None,
-                            'channel_id': str(entry.options.channel_id) if entry.options and entry.options.channel_id else None,
-                            'message_id': str(entry.options.message_id) if entry.options and entry.options.message_id else None,
-                            'auto_moderation_rule_name': entry.options.auto_moderation_rule_name if entry.options else None,
-                            'auto_moderation_rule_trigger_type': entry.options.auto_moderation_rule_trigger_type.name if entry.options and entry.options.auto_moderation_rule_trigger_type else None,
-                        } if entry.options else None,
+                        'changes': AuditLog._extract_changes(entry),
                         'created_at': entry.created_at.isoformat() if entry.created_at else None,
                     }
                     
@@ -263,38 +299,57 @@ class AuditLog(PluginInterface, PluginHelper):
     
     @staticmethod
     async def output_audit_logs(data):
-        """Output all stored audit log events as JSON."""
+        """Output all stored audit log events as JSON via DM."""
         try:
-            p = Permission("p.auditlog.view", data.artemis, False)
-            p.add_message_context(data.message)
-            if not await p.resolve():
-                await p.send_unauthorized_message(data.message.channel)
+            # Require command to be run in a guild (not DMs)
+            if not data.guild:
+                await data.message.channel.send("This command can only be used in a server, not in DMs.")
                 return
             
-            guild_id = data.guild.id if data.guild else None
+            guild_id = data.guild.id
             output = {}
             
-            if guild_id and guild_id in AuditLog._audit_log_storage:
-                # Output events for current guild
+            # Only output events for the current guild
+            if guild_id in AuditLog._audit_log_storage:
                 output[str(guild_id)] = list(AuditLog._audit_log_storage[guild_id].values())
             else:
-                # Output all events for all guilds
-                for gid, entries in AuditLog._audit_log_storage.items():
-                    output[str(gid)] = list(entries.values())
+                # No logs for this guild yet
+                output[str(guild_id)] = []
             
             import json
             json_output = json.dumps(output, indent=2, ensure_ascii=False)
             
-            # If JSON is too long, send as file attachment
-            if len(json_output) > 2000:
-                import io
-                file_obj = disnake.File(
-                    fp=io.BytesIO(json_output.encode('utf-8')),
-                    filename=f"audit_log_{guild_id or 'all'}.json"
+            # Try to send via DM
+            try:
+                # Get or create DM channel
+                dm_channel = await data.message.author.create_dm()
+                
+                # If JSON is too long, send as file attachment
+                if len(json_output) > 2000:
+                    import io
+                    file_obj = disnake.File(
+                        fp=io.BytesIO(json_output.encode('utf-8')),
+                        filename=f"audit_log_{guild_id}.json"
+                    )
+                    await dm_channel.send("Here is the audit log:", file=file_obj)
+                else:
+                    await dm_channel.send(f"```json\n{json_output}\n```")
+                
+                # Send confirmation in original channel
+                await data.message.channel.send(f"{data.message.author.mention}, I've sent the audit log to your DMs!")
+                
+            except disnake.Forbidden:
+                # User has DMs disabled
+                await data.message.channel.send(
+                    f"{data.message.author.mention}, I couldn't send you a DM. "
+                    "Please enable DMs from server members to receive the audit log."
                 )
-                await data.message.channel.send("", file=file_obj)
-            else:
-                await data.message.channel.send(f"```json\n{json_output}\n```")
+            except Exception as dm_error:
+                logger.error(f"Error sending audit log via DM: {dm_error}")
+                await data.message.channel.send(
+                    f"{data.message.author.mention}, I encountered an error sending the audit log via DM. "
+                    "Please check your privacy settings."
+                )
         
         except Exception as e:
             await AuditLog.exception_handler(data.message, e, True)

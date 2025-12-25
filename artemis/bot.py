@@ -64,16 +64,28 @@ class ArtemisBot(commands.Bot):
         # Initialize command parser
         self.command_parser = CommandParser(config.COMMAND_PREFIX)
         
+        # Expose logger as bot.log for plugin compatibility
+        self.log = logger
+        
         # Startup time
         import time
         self.startup_time = time.time()
         
         logger.info("Artemis bot initialized")
     
+    async def setup_hook(self):
+        """Called when the bot is about to connect to Discord."""
+        # Set status to busy (dnd) during startup
+        await self.change_presence(status=disnake.Status.dnd, activity=None)
+        logger.info("Bot connecting - status set to busy")
+    
     async def on_ready(self):
         """Called when bot is ready."""
         logger.info(f"Bot is ready! Logged in as {self.user}")
         logger.info(f"Connected to {len(self.guilds)} guilds")
+        
+        # Set bot status to online and apply configured activity
+        await self._set_status()
         
         # Start periodic tasks
         self.eventManager.start_periodic_tasks()
@@ -81,18 +93,51 @@ class ArtemisBot(commands.Bot):
         # Dispatch ready event
         await self.eventManager.dispatch_event("ready", self)
     
+    async def _set_status(self):
+        """Set the bot's presence status to online with configured activity."""
+        # Always set status to online when ready
+        activity_type = getattr(self.config, 'BOT_ACTIVITY_TYPE', None)
+        activity_text = getattr(self.config, 'BOT_ACTIVITY_TEXT', None)
+        
+        # Create activity if configured
+        activity = None
+        if activity_type and activity_text:
+            activity_type_map = {
+                'playing': disnake.ActivityType.playing,
+                'watching': disnake.ActivityType.watching,
+                'listening': disnake.ActivityType.listening,
+                'streaming': disnake.ActivityType.streaming,
+                'competing': disnake.ActivityType.competing
+            }
+            
+            activity_type_enum = activity_type_map.get(activity_type.lower(), disnake.ActivityType.playing)
+            
+            # For streaming, we need a URL
+            if activity_type_enum == disnake.ActivityType.streaming:
+                stream_url = getattr(self.config, 'BOT_STREAM_URL', 'https://twitch.tv')
+                activity = disnake.Streaming(name=activity_text, url=stream_url)
+            else:
+                activity = disnake.Activity(type=activity_type_enum, name=activity_text)
+        
+        # Set the presence to online
+        await self.change_presence(status=disnake.Status.online, activity=activity)
+        
+        if activity:
+            activity_str = f"{activity_type}: {activity_text}"
+            logger.info(f"Set bot presence - Status: online, {activity_str}")
+        else:
+            logger.info("Set bot presence - Status: online")
+    
     async def on_message(self, message: disnake.Message):
         """Handle incoming messages."""
         # Ignore bot messages
         if message.author.bot:
             return
         
-        # Process commands first (disnake's command system)
-        await self.process_commands(message)
-        
-        # Parse for prefix commands
+        # Parse for prefix commands (using custom command system)
         parsed = self.command_parser.parse(message.content)
         if parsed:
+            logger.info(f"Parsed command: '{parsed.command}' from message: '{message.content}'")
             # Create event data
             event_data = EventData(
                 message=message,
@@ -103,6 +148,8 @@ class ArtemisBot(commands.Bot):
             
             # Dispatch command event
             await self.eventManager.dispatch_command(parsed.command, event_data)
+        else:
+            logger.debug(f"Message did not parse as command: {message.content}")
         
         # Dispatch message event
         await self.eventManager.dispatch_event("message", EventData(
@@ -125,6 +172,7 @@ class ArtemisBot(commands.Bot):
         logger.info("Loading plugins...")
         self.plugin_loader.load_plugins(self)
         logger.info(f"Loaded {len(self.plugin_loader.loaded_plugins)} plugins")
+        logger.info(f"Registered commands: {sorted(self.eventManager.command_listeners.keys())}")
     
     def run(self) -> None:
         """Run the bot."""
@@ -142,6 +190,13 @@ class ArtemisBot(commands.Bot):
     async def close(self):
         """Cleanup on shutdown."""
         logger.info("Shutting down...")
+        
+        # Set status to offline before shutting down
+        try:
+            await self.change_presence(status=disnake.Status.invisible, activity=None)
+            logger.info("Set bot status to offline")
+        except Exception as e:
+            logger.warning(f"Failed to set offline status: {e}")
         
         # Stop periodic tasks
         self.eventManager.stop_periodic_tasks()

@@ -44,27 +44,27 @@ class Role(PluginInterface, PluginHelper):
             bot.log.info("Not adding role commands on testing.")
             return
         
-        bot.eventManager.addEventListener(
+        bot.eventManager.add_listener(
             EventListener.new()
             .add_command("role")
             .add_command("roles")
             .set_callback(Role.role_entry)
         )
         
-        bot.eventManager.addEventListener(
+        bot.eventManager.add_listener(
             EventListener.new()
             .add_command("bindrole")
             .set_callback(Role.role_bind)
         )
         
-        bot.eventManager.addEventListener(
+        bot.eventManager.add_listener(
             EventListener.new()
             .add_command("inheritrole")
             .set_callback(Role.role_inherit)
         )
         
         # Periodic task for inheritance
-        bot.eventManager.addEventListener(
+        bot.eventManager.add_listener(
             EventListener.new()
             .set_periodic(10)
             .set_callback(Role.poll_inheritance)

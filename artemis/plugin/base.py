@@ -85,9 +85,10 @@ class PluginHelper:
         return await message.channel.send("You are not authorized to use this command.")
     
     @staticmethod
-    def parse_guild_user(guild: disnake.Guild, text: str) -> Optional[disnake.Member]:
+    async def parse_guild_user(guild: disnake.Guild, text: str) -> Optional[disnake.Member]:
         """
         Parse a user from text (mention, username#discriminator, username, or ID).
+        Tries to fetch member if not in cache.
         
         Args:
             guild: Guild to search in
@@ -105,28 +106,51 @@ class PluginHelper:
         mention_match = re.match(r'<@!?(\d+)>', text)
         if mention_match:
             user_id = int(mention_match.group(1))
-            return guild.get_member(user_id)
+            member = guild.get_member(user_id)
+            if not member:
+                # Try fetching if not in cache
+                try:
+                    member = await guild.fetch_member(user_id)
+                except (disnake.NotFound, disnake.HTTPException):
+                    pass
+            return member
         
         # Try user ID
         try:
             user_id = int(text)
-            return guild.get_member(user_id)
+            member = guild.get_member(user_id)
+            if not member:
+                # Try fetching if not in cache
+                try:
+                    member = await guild.fetch_member(user_id)
+                except (disnake.NotFound, disnake.HTTPException):
+                    pass
+            return member
         except ValueError:
             pass
         
-        # Try username#discriminator format
+        # Try username#discriminator format (legacy Discord format)
         if '#' in text:
             username, discriminator = text.rsplit('#', 1)
             for member in guild.members:
                 if member.name == username and member.discriminator == discriminator:
                     return member
         
-        # Try username or display name
+        # Try username or display name (case-insensitive, partial match)
         text_lower = text.lower()
+        matches = []
         for member in guild.members:
             if (member.name.lower() == text_lower or 
                 (member.display_name and member.display_name.lower() == text_lower)):
-                return member
+                return member  # Exact match
+            # Partial matches for better search
+            if (member.name.lower().startswith(text_lower) or 
+                (member.display_name and member.display_name.lower().startswith(text_lower))):
+                matches.append(member)
+        
+        # Return first partial match if found
+        if matches:
+            return matches[0]
         
         return None
     

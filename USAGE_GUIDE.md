@@ -80,10 +80,6 @@ By default, the following permissions apply:
   - `!role`, `!roles` - Default: allowed
   - `!bindrole` - Default: denied
   - `!inheritrole` - Default: denied
-- **Event**: 
-  - `!event` - Default: allowed
-  - `!calendar` - Everyone
-  - `!setCalendar` - Default: denied
 - **Remind**: 
   - `!remind`, `!rem`, `!remindme`, `!reminder` - Everyone
 - **Agenda**: 
@@ -334,50 +330,6 @@ Bot: Role added to server role inheritance: Having @SourceRole will add @DestRol
 ```
 
 **Note**: Role inheritance is checked every 10 seconds automatically.
-
-### Event Commands
-
-#### `!event`
-**Description**: Add or remove an event from the calendar  
-**Usage**: `!event <when> <title>` or `!event remove <event_id>`  
-**Permission**: Default allowed (can be restricted)  
-**Options**:
-- `<when>`: Relative time (e.g., "5 hours", "next tuesday") or absolute time (e.g., "2025-02-18 5:00pm")
-- `<title>`: Event name/description
-- `remove <event_id>`: Remove an event you created
-
-**Example**:
-```
-You: !event "next friday 7pm" Movie Night
-Bot: [Embed confirming event creation with detected time]
-
-You: !event remove 1234567890
-Bot: If that was your event, it was removed :)
-```
-
-**Note**: Uses your timezone if set via `!timezone`, otherwise UTC.
-
-#### `!calendar`
-**Description**: View upcoming events for the server  
-**Usage**: `!calendar`  
-**Permission**: Everyone  
-**Example**:
-```
-You: !calendar
-Bot: [Embed showing upcoming events in your timezone]
-```
-
-#### `!setCalendar`
-**Description**: Set a channel message to automatically update with the calendar (admin only)  
-**Usage**: `!setCalendar <channel_mention>` or `!setCalendar <message_url>`  
-**Permission**: Default denied (requires `p.events.setcalendar`)  
-**Example**:
-```
-You: !setCalendar #events
-Bot: Calendar set to https://discord.com/channels/...
-```
-
-**Note**: Calendar messages update automatically every minute.
 
 ### Remind Commands
 
@@ -731,32 +683,6 @@ Self-assignable role management system.
 - Role bindings stored in `storage/roles/`
 - Inheritance rules stored in `storage/roles_inherit/`
 - Inheritance is checked every 10 seconds
-
-### Event Plugin
-
-Event calendar system with timezone support.
-
-**Features**:
-- Event creation and management
-- Calendar display
-- Automatic calendar message updates
-- Timezone-aware scheduling
-
-**Requirements**: No special setup needed.
-
-**Setup**:
-1. Users set their timezone with `!timezone`
-2. Create events with `!event <when> <title>`
-3. View calendar with `!calendar`
-4. (Optional) Set auto-updating calendar message with `!setCalendar`
-
-**Storage**:
-- Events stored in `storage/event/`
-- Calendar message references stored in `storage/event_calendar/`
-- Calendar updates every 60 seconds
-
-**Time Parsing**:
-- Supports relative times: "5 hours", "next tuesday", "2d3h"
 - Supports absolute times: "2025-02-18 5:00pm", "september 3rd"
 - Uses user's timezone if set, otherwise UTC
 
@@ -949,7 +875,6 @@ Internationalization and timezone management.
 - See [PHP timezone list](https://www.php.net/manual/en/timezones.php)
 
 **Integration**:
-- Used by Event plugin for event scheduling
 - Used by Remind plugin for reminder scheduling
 - Used by `!time` command for time conversion
 
@@ -1118,10 +1043,6 @@ For issues, questions, or contributions:
 - `!role [role]` - Toggle role or list roles
 - `!bindrole <role_id>` - Make role self-assignable (admin)
 - `!inheritrole <source> <dest>` - Set role inheritance (admin)
-- `!event <when> <title>` - Create event
-- `!event remove <id>` - Remove event
-- `!calendar` - View events
-- `!setCalendar <channel>` - Set auto-updating calendar (admin)
 - `!remind <when> [message]` - Set reminder
 - `!remind delete <id>` - Delete reminder
 - `!agenda <message>` - Tally votes
@@ -1145,8 +1066,6 @@ For issues, questions, or contributions:
 - `p.roles.toggle` - Toggle roles
 - `p.roles.list` - List roles
 - `p.roles.bind` - Bind/inherit roles
-- `p.events.add` - Add events
-- `p.events.setcalendar` - Set calendar
 - `p.moderation.state` - Post mod statements
 - `p.ironreach.changevc` - Change voice channels
 - `p.reminder.delete` - Delete others' reminders
@@ -1154,7 +1073,6 @@ For issues, questions, or contributions:
 ### Important Directories
 - `storage/` - JSON storage files
   - `storage/audit_log/` - Audit log entries
-  - `storage/event/` - Event calendar entries
   - `storage/remind/` - Reminder entries
   - `storage/roles/` - Role bindings
   - `storage/roles_inherit/` - Role inheritance rules

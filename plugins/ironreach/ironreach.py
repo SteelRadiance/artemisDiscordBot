@@ -45,14 +45,14 @@ class Ironreach(PluginInterface, PluginHelper):
             return
         
         # Only register for specific guild
-        bot.eventManager.addEventListener(
+        bot.eventManager.add_listener(
             EventListener.new()
             .add_command("talkingstick")
             .add_guild(Ironreach.IRONREACH_GUILD_ID)
             .set_callback(Ironreach.talkingstick)
         )
         
-        bot.eventManager.addEventListener(
+        bot.eventManager.add_listener(
             EventListener.new()
             .add_command("vc")
             .add_guild(Ironreach.IRONREACH_GUILD_ID)
@@ -60,14 +60,14 @@ class Ironreach(PluginInterface, PluginHelper):
         )
         
         # Periodic voice chat update
-        bot.eventManager.addEventListener(
+        bot.eventManager.add_listener(
             EventListener.new()
             .set_periodic(60 * 60)
             .set_callback(Ironreach.voice_chat_change)
         )
         
         # Register agenda config event
-        bot.eventManager.addEventListener(
+        bot.eventManager.add_listener(
             EventListener.new()
             .add_event("agendaPluginConf")
             .set_callback(Ironreach.handle_agenda_config)

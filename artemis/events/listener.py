@@ -17,6 +17,7 @@ class EventListener:
     command: Optional[str] = None
     periodic: Optional[int] = None  # Interval in seconds
     callback: Optional[Callable] = None
+    guild_id: Optional[int] = None  # Optional guild ID filter
     
     @classmethod
     def new(cls) -> "EventListener":
@@ -41,4 +42,9 @@ class EventListener:
     def set_callback(self, callback: Callable) -> "EventListener":
         """Set the callback function."""
         self.callback = callback
+        return self
+    
+    def add_guild(self, guild_id: int) -> "EventListener":
+        """Add a guild ID filter (command will only work in this guild)."""
+        self.guild_id = guild_id
         return self

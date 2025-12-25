@@ -60,38 +60,38 @@ class Management(PluginInterface, PluginHelper):
         Management.startup_time = time.time()
         
         # Register commands
-        bot.eventManager.addEventListener(
+        bot.eventManager.add_listener(
             EventListener.new()
             .add_command("ping")
             .set_callback(Management.ping)
         )
         
-        bot.eventManager.addEventListener(
+        bot.eventManager.add_listener(
             EventListener.new()
             .add_command("artemis")
             .set_callback(Management.info)
         )
         
-        bot.eventManager.addEventListener(
+        bot.eventManager.add_listener(
             EventListener.new()
             .add_command("restart")
             .set_callback(Management.restart)
         )
         
-        bot.eventManager.addEventListener(
+        bot.eventManager.add_listener(
             EventListener.new()
             .add_command("update")
             .set_callback(Management.update)
         )
         
-        bot.eventManager.addEventListener(
+        bot.eventManager.add_listener(
             EventListener.new()
             .add_command("invite")
             .set_callback(Management.invite)
         )
         
         # Register ready event
-        bot.eventManager.addEventListener(
+        bot.eventManager.add_listener(
             EventListener.new()
             .add_event("ready")
             .set_callback(lambda bot: setattr(Management, 'startup_time', time.time()))
@@ -242,6 +242,12 @@ class Management(PluginInterface, PluginHelper):
     async def invite(data):
         """Handle invite command."""
         try:
+            # Check admin permission
+            admin_ids = getattr(data.artemis.config, 'ADMIN_USER_IDS', [])
+            if str(data.message.author.id) not in admin_ids:
+                await Management.unauthorized(data.message)
+                return
+            
             # Generate OAuth invite URL
             oauth_url = disnake.utils.oauth_url(
                 client_id=data.artemis.user.id,

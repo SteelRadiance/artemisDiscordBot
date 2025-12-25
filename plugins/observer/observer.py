@@ -42,7 +42,7 @@ class Observer(PluginInterface, PluginHelper):
             bot.log.info("Not adding observer on testing.")
             return
         
-        bot.eventManager.addEventListener(
+        bot.eventManager.add_listener(
             EventListener.new()
             .add_command("observer")
             .set_callback(Observer.config)

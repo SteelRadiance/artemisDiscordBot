@@ -17,7 +17,22 @@ import logging
 
 if __name__ == "__main__":
     # Setup logging first
-    setup_logging()
+    # Check for log file path in config, default to logs/artemis.log
+    log_level = "INFO"
+    log_file = "logs/artemis.log"
+    
+    try:
+        from config import config
+        log_level = getattr(config, 'LOG_LEVEL', log_level)
+        log_file = getattr(config, 'LOG_FILE', log_file)
+    except ImportError:
+        pass  # Config not loaded yet, use defaults
+    
+    # Create logs directory if it doesn't exist
+    if log_file:
+        os.makedirs(os.path.dirname(log_file) if os.path.dirname(log_file) else '.', exist_ok=True)
+    
+    setup_logging(level=log_level, log_file=log_file)
     logger = logging.getLogger("artemis")
     
     try:

@@ -44,7 +44,7 @@ class Remind(PluginInterface, PluginHelper):
             bot.log.info("Not adding remind commands on testing.")
             return
         
-        bot.eventManager.addEventListener(
+        bot.eventManager.add_listener(
             EventListener.new()
             .add_command("rem")
             .add_command("remind")
@@ -54,7 +54,7 @@ class Remind(PluginInterface, PluginHelper):
         )
         
         # Periodic reminder check
-        bot.eventManager.addEventListener(
+        bot.eventManager.add_listener(
             EventListener.new()
             .set_periodic(10)
             .set_callback(Remind.reminder_poll)

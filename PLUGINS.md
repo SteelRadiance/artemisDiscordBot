@@ -2,7 +2,7 @@
 
 Complete list of all plugins in the Artemis repository with descriptions and dependency information.
 
-## Plugin List (15 Total)
+## Plugin List (14 Total)
 
 ### Core/Utility Plugins
 
@@ -43,12 +43,6 @@ Complete list of all plugins in the Artemis repository with descriptions and dep
 ---
 
 ### Event & Calendar
-
-#### Event
-**File**: `plugins/event/event.py`  
-**Description**: Event calendar system. Users can create events, view upcoming events, and manage event calendars. Supports timezone-aware scheduling.  
-**Dependencies**: **Localization** (uses `Localization::fetchTimezone()`)  
-**Commands**: `!event`, `!calendar`, `!setCalendar`
 
 #### Remind
 **File**: `plugins/remind/remind.py`  
@@ -134,8 +128,7 @@ graph TD
     User[User]
     Role[Role]
     
-    %% Event Plugins
-    Event[Event]
+    %% Reminder & Voting Plugins
     Remind[Remind]
     Agenda[Agenda]
     
@@ -152,7 +145,6 @@ graph TD
     Ironreach[Ironreach]
     
     %% Dependencies
-    Event --> Localization
     Remind --> Localization
     Ironreach -.->|listens to| Agenda
     
@@ -167,7 +159,6 @@ graph TD
 ## Dependency Details
 
 ### Class Usage (Not Inheritance)
-- **Event** uses `Localization::fetchTimezone()`
 - **Remind** uses `Localization::fetchTimezone()`
 
 ### Event Dependencies

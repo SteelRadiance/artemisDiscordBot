@@ -56,7 +56,7 @@ class PermissionFrontend(PluginInterface, PluginHelper):
             bot.log.info("Not adding permission frontend commands on testing.")
             return
         
-        bot.eventManager.addEventListener(
+        bot.eventManager.add_listener(
             EventListener.new()
             .add_command("permission")
             .add_command("perm")
@@ -116,7 +116,7 @@ class PermissionFrontend(PluginInterface, PluginHelper):
             if user_text == "@self":
                 member = data.message.member
             else:
-                member = PermissionFrontend.parse_guild_user(data.guild, user_text)
+                member = await PermissionFrontend.parse_guild_user(data.guild, user_text)
             
             if not member:
                 await data.message.reply("Unknown user.")
@@ -203,7 +203,7 @@ class PermissionFrontend(PluginInterface, PluginHelper):
                 target_type = PermissionFrontend.TARGET_ROLE
                 target_value = role.id
             elif target == "user":
-                member = PermissionFrontend.parse_guild_user(data.guild, target_value)
+                member = await PermissionFrontend.parse_guild_user(data.guild, target_value)
                 if not member:
                     await data.message.reply("Invalid user.")
                     return

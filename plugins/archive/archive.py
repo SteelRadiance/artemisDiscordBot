@@ -44,7 +44,7 @@ class Archive(PluginInterface, PluginHelper):
             bot.log.info("Not adding archive commands on testing.")
             return
         
-        bot.eventManager.addEventListener(
+        bot.eventManager.add_listener(
             EventListener.new()
             .add_command("archive")
             .set_callback(Archive.archive)
@@ -56,10 +56,7 @@ class Archive(PluginInterface, PluginHelper):
         try:
             admin_ids = getattr(data.artemis.config, 'ADMIN_USER_IDS', [])
             if str(data.message.author.id) not in admin_ids:
-                await data.message.channel.send(
-                    "Due to resource use, channel archiving is limited to bot owners only. "
-                    "Please let them know if you need a channel archived."
-                )
+                await Archive.unauthorized(data.message)
                 return
             
             channel_text = Archive.arg_substr(data.message.content, 1, 1)

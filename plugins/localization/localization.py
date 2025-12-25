@@ -43,13 +43,13 @@ class Localization(PluginInterface, PluginHelper):
             bot.log.info("Not adding localization commands on testing.")
             return
         
-        bot.eventManager.addEventListener(
+        bot.eventManager.add_listener(
             EventListener.new()
             .add_command("time")
             .set_callback(Localization.time_helper)
         )
         
-        bot.eventManager.addEventListener(
+        bot.eventManager.add_listener(
             EventListener.new()
             .add_command("timezone")
             .set_callback(Localization.timezone)

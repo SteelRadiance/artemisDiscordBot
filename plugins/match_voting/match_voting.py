@@ -46,13 +46,13 @@ class MatchVoting(PluginInterface, PluginHelper):
             bot.log.info("Not adding match voting commands on testing.")
             return
         
-        bot.eventManager.addEventListener(
+        bot.eventManager.add_listener(
             EventListener.new()
             .add_command("match")
             .set_callback(MatchVoting.match_handler)
         )
         
-        bot.eventManager.addEventListener(
+        bot.eventManager.add_listener(
             EventListener.new()
             .add_command("tally")
             .set_callback(MatchVoting.tally_handler)
@@ -155,7 +155,7 @@ class MatchVoting(PluginInterface, PluginHelper):
             user_text = args[1]
             competitor_data = " ".join(args[2:]) if len(args) > 2 else None
             
-            member = MatchVoting.parse_guild_user(data.guild, user_text)
+            member = await MatchVoting.parse_guild_user(data.guild, user_text)
             if not member:
                 await data.message.reply("Could not parse user.")
                 return

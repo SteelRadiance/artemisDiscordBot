@@ -42,7 +42,7 @@ class State(PluginInterface, PluginHelper):
             bot.log.info("Not adding state commands on testing.")
             return
         
-        bot.eventManager.addEventListener(
+        bot.eventManager.add_listener(
             EventListener.new()
             .add_command("state")
             .set_callback(State.process)

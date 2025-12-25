@@ -43,19 +43,19 @@ class User(PluginInterface, PluginHelper):
             bot.log.info("Not adding user commands on testing.")
             return
         
-        bot.eventManager.addEventListener(
+        bot.eventManager.add_listener(
             EventListener.new()
             .add_command("user")
             .set_callback(User.process)
         )
         
-        bot.eventManager.addEventListener(
+        bot.eventManager.add_listener(
             EventListener.new()
             .add_command("roster")
             .set_callback(User.roster)
         )
         
-        bot.eventManager.addEventListener(
+        bot.eventManager.add_listener(
             EventListener.new()
             .add_command("av")
             .set_callback(User.av)
@@ -69,7 +69,7 @@ class User(PluginInterface, PluginHelper):
             user_text = " ".join(args[1:]) if len(args) > 1 else ""
             
             if user_text:
-                member = User.parse_guild_user(data.message.guild, user_text)
+                member = await User.parse_guild_user(data.message.guild, user_text)
             else:
                 member = data.message.member
             
@@ -87,9 +87,7 @@ class User(PluginInterface, PluginHelper):
                 roles = ["<no roles>"]
             
             # Get permissions
-            perms = [perm for perm, value in member.guild_permissions if value]
-            room_perms = [perm for perm, value in member.permissions_in(data.message.channel) if value]
-            
+            perms = [perm for perm, value in member.guild_permissions if value] 
             embed = Embed(title="User Information", color=member.color)
             embed.set_thumbnail(url=member.display_avatar.url)
             embed.add_field(name="ID", value=str(member.id), inline=True)
@@ -111,8 +109,7 @@ class User(PluginInterface, PluginHelper):
                 embed.add_field(name="Roles", value=roles_text, inline=False)
             
             embed.add_field(name="Permissions", value="\n".join(perms[:20]) if perms else "None", inline=True)
-            embed.add_field(name="Room Permissions", value="\n".join(room_perms[:20]) if room_perms else "None", inline=True)
-            
+             
             await data.message.channel.send(embed=embed)
         except Exception as e:
             await User.exception_handler(data.message, e, True)
@@ -174,7 +171,7 @@ class User(PluginInterface, PluginHelper):
         """Handle av command."""
         try:
             user_text = User.arg_substr(data.message.content, 1) or ""
-            member = User.parse_guild_user(data.message.guild, user_text) if user_text else data.message.member
+            member = await User.parse_guild_user(data.message.guild, user_text) if user_text else data.message.member
             
             if not member:
                 await data.message.reply("Could not find that user.")

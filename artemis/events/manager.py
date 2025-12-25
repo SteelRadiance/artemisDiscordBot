@@ -25,7 +25,7 @@ class EventManager:
         """
         self.bot = bot
         self.event_listeners: Dict[str, List[Callable]] = {}
-        self.command_listeners: Dict[str, List[Callable]] = {}
+        self.command_listeners: Dict[str, List[tuple]] = {}  # List of (callback, guild_id) tuples
         self.periodic_tasks: List[tuple] = []  # List of (interval, callback) tuples
         self._periodic_task_handles: List[asyncio.Task] = []
     
@@ -47,8 +47,10 @@ class EventManager:
             if listener.command not in self.command_listeners:
                 self.command_listeners[listener.command] = []
             if listener.callback:
-                self.command_listeners[listener.command].append(listener.callback)
-                logger.debug(f"Registered command listener: {listener.command}")
+                # Store callback with guild_id filter (None if no filter)
+                self.command_listeners[listener.command].append((listener.callback, listener.guild_id))
+                logger.info(f"Registered command listener: {listener.command}" + 
+                           (f" (guild: {listener.guild_id})" if listener.guild_id else ""))
         
         if listener.periodic and listener.callback:
             self.periodic_tasks.append((listener.periodic, listener.callback))
@@ -82,8 +84,19 @@ class EventManager:
             *args: Command arguments
             **kwargs: Command keyword arguments
         """
+        logger.info(f"Dispatching command: '{command}', available commands: {sorted(self.command_listeners.keys())}")
         if command in self.command_listeners:
-            for callback in self.command_listeners[command]:
+            # Extract guild from EventData if present
+            guild_id = None
+            if args and hasattr(args[0], 'guild') and args[0].guild:
+                guild_id = args[0].guild.id
+            
+            for callback, filter_guild_id in self.command_listeners[command]:
+                # Skip if guild filter doesn't match
+                if filter_guild_id is not None and guild_id != filter_guild_id:
+                    logger.debug(f"Skipping command {command} due to guild filter: {filter_guild_id} != {guild_id}")
+                    continue
+                
                 try:
                     if asyncio.iscoroutinefunction(callback):
                         await callback(*args, **kwargs)
@@ -91,6 +104,8 @@ class EventManager:
                         callback(*args, **kwargs)
                 except Exception as e:
                     logger.error(f"Error in command listener for {command}: {e}", exc_info=True)
+        else:
+            logger.warning(f"Command '{command}' not found in registered commands: {sorted(self.command_listeners.keys())}")
     
     def start_periodic_tasks(self) -> None:
         """Start all registered periodic tasks."""

@@ -45,7 +45,7 @@ class GamesBot(PluginInterface, PluginHelper):
             bot.log.info("Not adding gamesbot commands on testing.")
             return
         
-        bot.eventManager.addEventListener(
+        bot.eventManager.add_listener(
             EventListener.new()
             .add_command("gamesbot")
             .add_command("gamebot")
