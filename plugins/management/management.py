@@ -312,7 +312,7 @@ class Management(PluginInterface, PluginHelper):
                 "bindrole": ("p.roles.bind", False, "Make a role self-assignable (admin)", "Role"),
                 "inheritrole": ("p.roles.bind", False, "Set up role inheritance (admin)", "Role"),
                 
-                "remind": (None, True, "Set a reminder", "Remind"),
+                "remind": (None, True, "Set a reminder (use !remind delete <id> to remove)", "Remind"),
                 "rem": (None, True, "Set a reminder (short)", "Remind"),
                 "remindme": (None, True, "Set a reminder", "Remind"),
                 "reminder": (None, True, "Set a reminder", "Remind"),
@@ -323,19 +323,19 @@ class Management(PluginInterface, PluginHelper):
                 
                 "archive": (None, False, "Archive a channel (admin only)", "Archive"),
                 
-                "gamesbot": (None, True, "Game tagging system", "GamesBot"),
+                "gamesbot": (None, True, "Game tagging system (add/remove/list/ping)", "GamesBot"),
                 "gamebot": (None, True, "Game tagging system (short)", "GamesBot"),
                 "gb": (None, True, "Game tagging system (short)", "GamesBot"),
                 
-                "match": (None, True, "Create or manage matches", "MatchVoting"),
+                "match": (None, True, "Create or manage matches (some subcommands require manage_roles or admin)", "MatchVoting"),
                 "tally": (None, True, "View match voting results", "MatchVoting"),
                 
                 "observer": (None, False, "Configure moderation logging (admin)", "Observer"),
                 
-                "timezone": (None, True, "Set your timezone", "Localization"),
+                "timezone": (None, True, "Set or view your timezone", "Localization"),
                 "time": (None, True, "Convert time to all timezones", "Localization"),
                 
-                "auditlog": ("p.auditlog.view", False, "View audit log entries", "AuditLog"),
+                "auditlog": (None, True, "View audit log entries (sent via DM)", "AuditLog"),
                 
                 "permission": (None, True, "Check or manage permissions", "Permission"),
                 "perm": (None, True, "Check or manage permissions (short)", "Permission"),

@@ -22,11 +22,16 @@ Features:
 
 import logging
 import asyncio
+import os
+import json
 from typing import Dict, List, Optional, Any
 from collections import defaultdict
 from datetime import datetime
+from pathlib import Path
 
 import disnake
+import aiofiles
+import aiofiles.os
 
 from artemis.plugin.base import PluginInterface, PluginHelper
 from artemis.events.listener import EventListener
@@ -39,6 +44,12 @@ class AuditLog(PluginInterface, PluginHelper):
     
     # In-memory storage: {guild_id: {entry_id: entry_data}}
     _audit_log_storage: Dict[int, Dict[str, Any]] = defaultdict(dict)
+    
+    # Current log file per guild: {guild_id: file_path}
+    _current_log_files: Dict[int, Path] = {}
+    
+    # Maximum file size in bytes (default 10MB)
+    MAX_LOG_FILE_SIZE = 10 * 1024 * 1024
     
     @staticmethod
     def register(bot):
@@ -64,11 +75,104 @@ class AuditLog(PluginInterface, PluginHelper):
         )
     
     @staticmethod
+    def _get_log_dir(bot) -> Path:
+        """Get the log file directory path."""
+        storage_dir = Path(getattr(bot.storage, 'storage_dir', Path('storage')))
+        log_dir = storage_dir / "audit_log" / "logs"
+        return log_dir
+    
+    @staticmethod
+    async def _get_current_log_file(bot, guild_id: int) -> Path:
+        """Get the current log file for a guild, creating it if needed."""
+        log_dir = AuditLog._get_log_dir(bot)
+        await aiofiles.os.makedirs(log_dir, exist_ok=True)
+        
+        if guild_id not in AuditLog._current_log_files:
+            # Find the most recent log file or create a new one
+            guild_prefix = f"{guild_id}_"
+            log_files = []
+            
+            try:
+                async for entry in aiofiles.os.scandir(log_dir):
+                    if entry.name.startswith(guild_prefix) and entry.name.endswith('.json'):
+                        log_files.append(entry.path)
+            except FileNotFoundError:
+                pass
+            
+            if log_files:
+                # Sort by modification time, most recent first
+                log_files.sort(key=lambda p: os.path.getmtime(p), reverse=True)
+                current_file = Path(log_files[0])
+                
+                # Check if current file is too large
+                try:
+                    size = await aiofiles.os.path.getsize(current_file)
+                    if size >= AuditLog.MAX_LOG_FILE_SIZE:
+                        # Create a new file
+                        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+                        current_file = log_dir / f"{guild_id}_log_{timestamp}.json"
+                except Exception:
+                    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+                    current_file = log_dir / f"{guild_id}_log_{timestamp}.json"
+            else:
+                # Create first log file
+                timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+                current_file = log_dir / f"{guild_id}_log_{timestamp}.json"
+            
+            AuditLog._current_log_files[guild_id] = current_file
+        
+        return AuditLog._current_log_files[guild_id]
+    
+    @staticmethod
+    async def _append_to_log_file(bot, guild_id: int, entry_data: Dict[str, Any]):
+        """Append an entry to the current log file, rotating if needed."""
+        try:
+            log_file = await AuditLog._get_current_log_file(bot, guild_id)
+            
+            # Check file size and rotate if needed
+            try:
+                size = await aiofiles.os.path.getsize(log_file)
+                if size >= AuditLog.MAX_LOG_FILE_SIZE:
+                    # Rotate to new file
+                    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+                    log_dir = AuditLog._get_log_dir(bot)
+                    new_file = log_dir / f"{guild_id}_log_{timestamp}.json"
+                    AuditLog._current_log_files[guild_id] = new_file
+                    log_file = new_file
+            except FileNotFoundError:
+                pass
+            
+            # Read existing entries or create new list
+            entries = []
+            if await aiofiles.os.path.exists(log_file):
+                try:
+                    async with aiofiles.open(log_file, 'r', encoding='utf-8') as f:
+                        content = await f.read()
+                        if content.strip():
+                            entries = json.loads(content)
+                            if not isinstance(entries, list):
+                                entries = []
+                except (json.JSONDecodeError, Exception) as e:
+                    logger.warning(f"Error reading log file {log_file}: {e}, creating new file")
+                    entries = []
+            
+            # Append new entry
+            entries.append(entry_data)
+            
+            # Write back to file
+            async with aiofiles.open(log_file, 'w', encoding='utf-8') as f:
+                await f.write(json.dumps(entries, indent=2, ensure_ascii=False))
+        
+        except Exception as e:
+            logger.error(f"Error appending to log file: {e}", exc_info=True)
+    
+    @staticmethod
     async def load_from_storage(bot):
-        """Load existing audit log entries from JSON storage."""
+        """Load existing audit log entries from JSON storage and log files."""
         try:
             await asyncio.sleep(2)
             
+            # Load from JSON storage (legacy)
             all_stored = await bot.storage.get_all("audit_log")
             for key, entry_data in all_stored.items():
                 parts = key.split('_', 1)
@@ -83,6 +187,43 @@ class AuditLog(PluginInterface, PluginHelper):
                         AuditLog._audit_log_storage[guild_id][entry_id] = entry_data
                     except ValueError:
                         continue
+            
+            # Load from log files
+            log_dir = AuditLog._get_log_dir(bot)
+            if await aiofiles.os.path.exists(log_dir):
+                guild_files: Dict[int, List[Path]] = defaultdict(list)
+                
+                async for entry in aiofiles.os.scandir(log_dir):
+                    if entry.name.endswith('.json'):
+                        try:
+                            # Parse filename: {guild_id}_log_{timestamp}.json
+                            parts = entry.name.replace('.json', '').split('_log_')
+                            if len(parts) == 2:
+                                guild_id = int(parts[0])
+                                guild_files[guild_id].append(Path(entry.path))
+                        except (ValueError, IndexError):
+                            continue
+                
+                # Load entries from all log files
+                for guild_id, files in guild_files.items():
+                    # Sort by modification time, most recent first
+                    files.sort(key=lambda p: os.path.getmtime(p), reverse=True)
+                    
+                    for log_file in files:
+                        try:
+                            async with aiofiles.open(log_file, 'r', encoding='utf-8') as f:
+                                content = await f.read()
+                                if content.strip():
+                                    entries = json.loads(content)
+                                    if isinstance(entries, list):
+                                        for entry_data in entries:
+                                            entry_id = entry_data.get('id')
+                                            if entry_id:
+                                                if guild_id not in AuditLog._audit_log_storage:
+                                                    AuditLog._audit_log_storage[guild_id] = {}
+                                                AuditLog._audit_log_storage[guild_id][entry_id] = entry_data
+                        except Exception as e:
+                            logger.warning(f"Error loading log file {log_file}: {e}")
             
             total_entries = sum(len(entries) for entries in AuditLog._audit_log_storage.values())
             if total_entries > 0:
@@ -118,6 +259,13 @@ class AuditLog(PluginInterface, PluginHelper):
             
             AuditLog._audit_log_storage[guild_id][entry_id] = entry_data
             
+            # Write to log file
+            try:
+                await AuditLog._append_to_log_file(bot, guild_id, entry_data)
+            except Exception as e:
+                logger.warning(f"Failed to write audit log entry to file: {e}")
+            
+            # Also write to legacy JSON storage for backward compatibility
             try:
                 await bot.storage.set("audit_log", f"{guild_id}_{entry_id}", entry_data)
             except Exception as e:
@@ -163,6 +311,27 @@ class AuditLog(PluginInterface, PluginHelper):
         return changes
     
     @staticmethod
+    async def _get_all_log_files(bot, guild_id: int) -> List[Path]:
+        """Get all log files for a guild, sorted by most recent first."""
+        log_dir = AuditLog._get_log_dir(bot)
+        log_files = []
+        
+        if not await aiofiles.os.path.exists(log_dir):
+            return log_files
+        
+        guild_prefix = f"{guild_id}_"
+        try:
+            async for entry in aiofiles.os.scandir(log_dir):
+                if entry.name.startswith(guild_prefix) and entry.name.endswith('.json'):
+                    log_files.append(Path(entry.path))
+        except FileNotFoundError:
+            return log_files
+        
+        # Sort by modification time, most recent first
+        log_files.sort(key=lambda p: os.path.getmtime(p), reverse=True)
+        return log_files
+    
+    @staticmethod
     async def output_audit_logs(data):
         """Output all stored audit log events as JSON or readable format via DM."""
         try:
@@ -173,46 +342,166 @@ class AuditLog(PluginInterface, PluginHelper):
             args = AuditLog.split_command(data.message.content)
             readable = len(args) > 1 and args[1].lower() == '-readable'
             
-            if readable:
-                await AuditLog.output_readable_audit_logs(data)
-            else:
-                guild_id = data.guild.id
-                output = {}
+            guild_id = data.guild.id
+            bot = data.artemis
+            
+            # Get all log files for this guild
+            log_files = await AuditLog._get_all_log_files(bot, guild_id)
+            
+            if not log_files:
+                await data.message.channel.send("No audit log files found for this server.")
+                return
+            
+            try:
+                dm_channel = await data.message.author.create_dm()
                 
-                if guild_id in AuditLog._audit_log_storage:
-                    output[str(guild_id)] = list(AuditLog._audit_log_storage[guild_id].values())
+                if readable:
+                    # Send readable format from all log files
+                    for i, log_file in enumerate(log_files):
+                        try:
+                            async with aiofiles.open(log_file, 'r', encoding='utf-8') as f:
+                                content = await f.read()
+                                if content.strip():
+                                    entries = json.loads(content)
+                                    if isinstance(entries, list) and entries:
+                                        # Format as readable
+                                        lines = []
+                                        file_name = log_file.name
+                                        lines.append(f"**Log File: {file_name}**\n")
+                                        
+                                        # Sort entries by timestamp (most recent first)
+                                        def get_timestamp(entry):
+                                            if entry.get('created_at'):
+                                                try:
+                                                    return datetime.fromisoformat(entry['created_at'])
+                                                except (ValueError, TypeError):
+                                                    return datetime.min
+                                            return datetime.min
+                                        
+                                        sorted_entries = sorted(entries, key=get_timestamp, reverse=True)
+                                        
+                                        for entry in sorted_entries:
+                                            timestamp_str = "Unknown"
+                                            if entry.get('created_at'):
+                                                try:
+                                                    dt = datetime.fromisoformat(entry['created_at'])
+                                                    timestamp_str = dt.strftime("%Y-%m-%d %H:%M:%S")
+                                                except (ValueError, TypeError):
+                                                    pass
+                                            
+                                            entry_id = entry.get('id', 'Unknown')
+                                            action = entry.get('action', 'Unknown')
+                                            
+                                            # Resolve user ID to username
+                                            user_str = "Unknown"
+                                            if entry.get('user_id'):
+                                                try:
+                                                    user_id = int(entry['user_id'])
+                                                    member = data.guild.get_member(user_id)
+                                                    if member:
+                                                        user_str = f"{member.display_name} ({member.name}#{member.discriminator})"
+                                                    else:
+                                                        user = bot.get_user(user_id)
+                                                        if user:
+                                                            user_str = f"{user.name}#{user.discriminator}"
+                                                        else:
+                                                            user_str = f"User ID: {user_id}"
+                                                except (ValueError, TypeError):
+                                                    user_str = f"User ID: {entry['user_id']}"
+                                            
+                                            # Resolve target ID
+                                            target_str = "None"
+                                            if entry.get('target_id'):
+                                                try:
+                                                    target_id = int(entry['target_id'])
+                                                    target_member = data.guild.get_member(target_id)
+                                                    if target_member:
+                                                        target_str = f"{target_member.display_name} ({target_member.name}#{target_member.discriminator})"
+                                                    else:
+                                                        target_channel = data.guild.get_channel(target_id)
+                                                        if target_channel:
+                                                            target_str = f"#{target_channel.name}"
+                                                        else:
+                                                            target_role = data.guild.get_role(target_id)
+                                                            if target_role:
+                                                                target_str = f"@{target_role.name}"
+                                                            else:
+                                                                target_user = bot.get_user(target_id)
+                                                                if target_user:
+                                                                    target_str = f"{target_user.name}#{target_user.discriminator}"
+                                                                else:
+                                                                    target_str = f"ID: {target_id}"
+                                                except (ValueError, TypeError):
+                                                    target_str = f"ID: {entry['target_id']}"
+                                            
+                                            lines.append(f"**{timestamp_str}** | ID: `{entry_id}`")
+                                            lines.append(f"  Action: {action}")
+                                            lines.append(f"  User: {user_str}")
+                                            lines.append(f"  Target: {target_str}")
+                                            lines.append("")
+                                        
+                                        output_text = "\n".join(lines)
+                                        
+                                        if len(output_text) > 2000:
+                                            # Split into chunks
+                                            chunks = []
+                                            current_chunk = []
+                                            current_length = 0
+                                            
+                                            for line in lines:
+                                                line_length = len(line) + 1
+                                                if current_length + line_length > 1900:
+                                                    if current_chunk:
+                                                        chunks.append("\n".join(current_chunk))
+                                                    current_chunk = [line]
+                                                    current_length = line_length
+                                                else:
+                                                    current_chunk.append(line)
+                                                    current_length += line_length
+                                            
+                                            if current_chunk:
+                                                chunks.append("\n".join(current_chunk))
+                                            
+                                            for j, chunk in enumerate(chunks):
+                                                if j == 0:
+                                                    await dm_channel.send(f"**{file_name}** (Part {j+1}/{len(chunks)})\n```\n{chunk}\n```")
+                                                else:
+                                                    await dm_channel.send(f"**Part {j+1}/{len(chunks)}**\n```\n{chunk}\n```")
+                                        else:
+                                            await dm_channel.send(f"```\n{output_text}\n```")
+                        except Exception as e:
+                            logger.warning(f"Error reading log file {log_file}: {e}")
+                            continue
+                    
+                    await data.message.channel.send(f"{data.message.author.mention}, I've sent the readable audit log to your DMs!")
                 else:
-                    output[str(guild_id)] = []
-                
-                import json
-                json_output = json.dumps(output, indent=2, ensure_ascii=False)
-                
-                try:
-                    dm_channel = await data.message.author.create_dm()
+                    # Send JSON files
+                    for i, log_file in enumerate(log_files):
+                        try:
+                            file_obj = disnake.File(
+                                fp=log_file,
+                                filename=log_file.name
+                            )
+                            if i == 0:
+                                await dm_channel.send(f"Audit log files for {data.guild.name} (most recent first):", file=file_obj)
+                            else:
+                                await dm_channel.send(file=file_obj)
+                        except Exception as e:
+                            logger.warning(f"Error sending log file {log_file}: {e}")
                     
-                    if len(json_output) > 2000:
-                        import io
-                        file_obj = disnake.File(
-                            fp=io.BytesIO(json_output.encode('utf-8')),
-                            filename=f"audit_log_{guild_id}.json"
-                        )
-                        await dm_channel.send("Here is the audit log:", file=file_obj)
-                    else:
-                        await dm_channel.send(f"```json\n{json_output}\n```")
-                    
-                    await data.message.channel.send(f"{data.message.author.mention}, I've sent the audit log to your DMs!")
+                    await data.message.channel.send(f"{data.message.author.mention}, I've sent the audit log files to your DMs!")
                 
-                except disnake.Forbidden:
-                    await data.message.channel.send(
-                        f"{data.message.author.mention}, I couldn't send you a DM. "
-                        "Please enable DMs from server members to receive the audit log."
-                    )
-                except Exception as dm_error:
-                    logger.error(f"Error sending audit log via DM: {dm_error}")
-                    await data.message.channel.send(
-                        f"{data.message.author.mention}, I encountered an error sending the audit log via DM. "
-                        "Please check your privacy settings."
-                    )
+            except disnake.Forbidden:
+                await data.message.channel.send(
+                    f"{data.message.author.mention}, I couldn't send you a DM. "
+                    "Please enable DMs from server members to receive the audit log."
+                )
+            except Exception as dm_error:
+                logger.error(f"Error sending audit log via DM: {dm_error}")
+                await data.message.channel.send(
+                    f"{data.message.author.mention}, I encountered an error sending the audit log via DM. "
+                    "Please check your privacy settings."
+                )
         
         except Exception as e:
             await AuditLog.exception_handler(data.message, e, True)
@@ -231,145 +520,5 @@ class AuditLog(PluginInterface, PluginHelper):
     
     @staticmethod
     async def output_readable_audit_logs(data):
-        """Output a human-readable audit log via DM."""
-        try:
-            if not data.guild:
-                await data.message.channel.send("This command can only be used in a server, not in DMs.")
-                return
-            
-            guild_id = data.guild.id
-            bot = data.artemis
-            
-            if guild_id not in AuditLog._audit_log_storage:
-                await data.message.channel.send("No audit log entries found for this server.")
-                return
-            
-            entries = list(AuditLog._audit_log_storage[guild_id].values())
-            
-            # Sort by timestamp (most recent first)
-            def get_timestamp(entry):
-                if entry.get('created_at'):
-                    try:
-                        return datetime.fromisoformat(entry['created_at'])
-                    except (ValueError, TypeError):
-                        return datetime.min
-                return datetime.min
-            
-            entries.sort(key=get_timestamp, reverse=True)
-            
-            lines = []
-            lines.append(f"**Audit Log for {data.guild.name}**\n")
-            
-            for entry in entries:
-                timestamp_str = "Unknown"
-                if entry.get('created_at'):
-                    try:
-                        dt = datetime.fromisoformat(entry['created_at'])
-                        timestamp_str = dt.strftime("%Y-%m-%d %H:%M:%S")
-                    except (ValueError, TypeError):
-                        pass
-                
-                entry_id = entry.get('id', 'Unknown')
-                action = entry.get('action', 'Unknown')
-                
-                # Resolve user ID to username
-                user_str = "Unknown"
-                if entry.get('user_id'):
-                    try:
-                        user_id = int(entry['user_id'])
-                        member = data.guild.get_member(user_id)
-                        if member:
-                            user_str = f"{member.display_name} ({member.name}#{member.discriminator})"
-                        else:
-                            user = bot.get_user(user_id)
-                            if user:
-                                user_str = f"{user.name}#{user.discriminator}"
-                            else:
-                                user_str = f"User ID: {user_id}"
-                    except (ValueError, TypeError):
-                        user_str = f"User ID: {entry['user_id']}"
-                
-                # Resolve target ID to username or channel name
-                target_str = "None"
-                if entry.get('target_id'):
-                    try:
-                        target_id = int(entry['target_id'])
-                        # Try as member first
-                        target_member = data.guild.get_member(target_id)
-                        if target_member:
-                            target_str = f"{target_member.display_name} ({target_member.name}#{target_member.discriminator})"
-                        else:
-                            # Try as channel
-                            target_channel = data.guild.get_channel(target_id)
-                            if target_channel:
-                                target_str = f"#{target_channel.name}"
-                            else:
-                                # Try as role
-                                target_role = data.guild.get_role(target_id)
-                                if target_role:
-                                    target_str = f"@{target_role.name}"
-                                else:
-                                    # Try as user (may not be in guild)
-                                    target_user = bot.get_user(target_id)
-                                    if target_user:
-                                        target_str = f"{target_user.name}#{target_user.discriminator}"
-                                    else:
-                                        target_str = f"ID: {target_id}"
-                    except (ValueError, TypeError):
-                        target_str = f"ID: {entry['target_id']}"
-                
-                lines.append(f"**{timestamp_str}** | ID: `{entry_id}`")
-                lines.append(f"  Action: {action}")
-                lines.append(f"  User: {user_str}")
-                lines.append(f"  Target: {target_str}")
-                lines.append("")
-            
-            output_text = "\n".join(lines)
-            
-            try:
-                dm_channel = await data.message.author.create_dm()
-                
-                if len(output_text) > 2000:
-                    # Split into chunks
-                    chunks = []
-                    current_chunk = []
-                    current_length = 0
-                    
-                    for line in lines:
-                        line_length = len(line) + 1  # +1 for newline
-                        if current_length + line_length > 1900:
-                            if current_chunk:
-                                chunks.append("\n".join(current_chunk))
-                            current_chunk = [line]
-                            current_length = line_length
-                        else:
-                            current_chunk.append(line)
-                            current_length += line_length
-                    
-                    if current_chunk:
-                        chunks.append("\n".join(current_chunk))
-                    
-                    for i, chunk in enumerate(chunks):
-                        if i == 0:
-                            await dm_channel.send(f"**Audit Log for {data.guild.name}** (Part {i+1}/{len(chunks)})\n```\n{chunk}\n```")
-                        else:
-                            await dm_channel.send(f"**Part {i+1}/{len(chunks)}**\n```\n{chunk}\n```")
-                else:
-                    await dm_channel.send(f"```\n{output_text}\n```")
-                
-                await data.message.channel.send(f"{data.message.author.mention}, I've sent the readable audit log to your DMs!")
-            
-            except disnake.Forbidden:
-                await data.message.channel.send(
-                    f"{data.message.author.mention}, I couldn't send you a DM. "
-                    "Please enable DMs from server members to receive the audit log."
-                )
-            except Exception as dm_error:
-                logger.error(f"Error sending readable audit log via DM: {dm_error}")
-                await data.message.channel.send(
-                    f"{data.message.author.mention}, I encountered an error sending the audit log via DM. "
-                    "Please check your privacy settings."
-                )
-        
-        except Exception as e:
-            await AuditLog.exception_handler(data.message, e, True)
+        """Output a human-readable audit log via DM (legacy method, now handled by output_audit_logs)."""
+        await AuditLog.output_audit_logs(data)
