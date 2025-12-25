@@ -19,6 +19,11 @@ wheels/
 .installed.cfg
 *.egg
 
+# Python cache
+__pycache__/
+*.py[cod]
+*$py.class
+
 # IDE
 .vscode/
 .idea/
