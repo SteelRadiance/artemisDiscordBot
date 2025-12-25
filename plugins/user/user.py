@@ -77,7 +77,6 @@ class User(PluginInterface, PluginHelper):
                 await data.message.reply("Could not find that user.")
                 return
             
-            # Build roles list
             roles = []
             for role in sorted(member.roles, key=lambda r: r.position, reverse=True):
                 if role.name != "@everyone":
@@ -86,7 +85,6 @@ class User(PluginInterface, PluginHelper):
             if not roles:
                 roles = ["<no roles>"]
             
-            # Get permissions
             perms = [perm for perm, value in member.guild_permissions if value] 
             embed = Embed(title="User Information", color=member.color)
             embed.set_thumbnail(url=member.display_avatar.url)
@@ -95,7 +93,6 @@ class User(PluginInterface, PluginHelper):
             embed.add_field(name="Nick", value=member.display_name if member.display_name != member.name else "<unset>", inline=True)
             embed.add_field(name="Color", value=str(member.color) if member.color.value else "<unset>", inline=True)
             
-            # Split roles if too long
             roles_text = "\n".join(roles)
             if len(roles_text) > 1024:
                 chunks = [roles_text[i:i+1024] for i in range(0, len(roles_text), 1024)]
@@ -149,7 +146,6 @@ class User(PluginInterface, PluginHelper):
                 await data.message.reply(f"No members found with role {role.mention}")
                 return
             
-            # Format output
             lines = []
             max_name_len = 0
             for member in members_with_role:

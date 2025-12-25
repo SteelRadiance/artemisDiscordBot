@@ -63,7 +63,6 @@ class State(PluginInterface, PluginHelper):
                 await data.message.reply("Usage: `!state [channel] then the rest of your message`")
                 return
             
-            # Check if first argument is a channel mention
             channel = State.channel_mention(ctxt, data.message.guild)
             if channel:
                 state_text = State.arg_substr(data.message.content, 2)
@@ -77,7 +76,6 @@ class State(PluginInterface, PluginHelper):
                 await data.message.reply("Usage: `!state [channel] then the rest of your message`")
                 return
             
-            # Generate ID (simplified - in PHP uses Snowflake)
             import time
             state_id = f"{int(time.time())}"
             
@@ -89,7 +87,6 @@ class State(PluginInterface, PluginHelper):
             )
             embed.set_footer(text=f"Mod Statement {state_id}", icon_url=pic)
             
-            # Extract mentions
             mentions = " ".join([str(user) for user in data.message.mentions])
             if mentions:
                 mentions = mentions + " - "

@@ -193,7 +193,6 @@ class MatchVoting(PluginInterface, PluginHelper):
             match_id = args[0]
             entry_id = args[1]
             
-            # Check if match exists and deadline hasn't passed
             match_data = await data.artemis.storage.get("match_matches", match_id)
             if not match_data:
                 await data.message.reply("Match not found.")
@@ -206,7 +205,6 @@ class MatchVoting(PluginInterface, PluginHelper):
                 await data.message.delete()
                 return
             
-            # Store vote
             await data.artemis.storage.set("match_votes", f"{match_id}_{data.message.author.id}", {
                 "voter_id": str(data.message.author.id),
                 "match_id": match_id,
@@ -245,7 +243,6 @@ class MatchVoting(PluginInterface, PluginHelper):
                 await data.message.reply("Match not found.")
                 return
             
-            # Get competitors
             competitors_data = await data.artemis.storage.get_all("match_competitors")
             competitors = [
                 v for k, v in competitors_data.items()
@@ -290,7 +287,6 @@ class MatchVoting(PluginInterface, PluginHelper):
                 await data.message.reply("Match not found.")
                 return
             
-            # Get competitors and votes
             competitors_data = await data.artemis.storage.get_all("match_competitors")
             competitors = {
                 v["competitor_id"]: v
@@ -318,7 +314,6 @@ class MatchVoting(PluginInterface, PluginHelper):
             resp.append(f"Total votes: {total_votes}")
             
             if is_admin:
-                # Show detailed results
                 for comp_id, comp in competitors.items():
                     comp_votes = [v for v in votes if v.get("competitor_id") == comp_id]
                     member = data.guild.get_member(int(comp["discord_id"]))

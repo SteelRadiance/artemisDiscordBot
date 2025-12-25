@@ -67,33 +67,26 @@ class Agenda(PluginInterface, PluginHelper):
     @staticmethod
     async def handle_config_event(bot, configs: dict):
         """Handle agenda configuration event."""
-        # This allows other plugins to provide configuration
-        # For now, use default config
         pass
     
     @staticmethod
     async def agenda_tally_handler(data):
         """Handle agenda tally command."""
         try:
-            # Get configuration (simplified - in PHP this comes from event)
             config = Agenda.CONF_TPL.copy()
             
-            # Get message URL/ID
             msg_ref = Agenda.arg_substr(data.message.content, 1, 1)
             if not msg_ref:
                 await data.message.reply("Usage: `!agenda <message_url_or_id>`")
                 return
             
-            # Fetch message
             import_msg = await Agenda.fetch_message(data.artemis, msg_ref)
             if not import_msg:
                 await data.message.reply("Could not find that message.")
                 return
             
-            # Get all reactions
             import_msg = await data.message.channel.fetch_message(import_msg.id)
             
-            # Get staff members
             staff_role_id = config.get('staffRole', 0)
             staff_members = {}
             if staff_role_id:
@@ -103,7 +96,6 @@ class Agenda(PluginInterface, PluginHelper):
                         if staff_role in member.roles:
                             staff_members[member.id] = None
             
-            # Count votes from reactions
             vote_types = config.get('voteTypes', {})
             vote_counts = {vote_type: [] for vote_type in vote_types.keys()}
             
@@ -111,7 +103,6 @@ class Agenda(PluginInterface, PluginHelper):
                 emoji_id = reaction.emoji.id if reaction.emoji.id else str(reaction.emoji)
                 users = [user async for user in reaction.users()]
                 
-                # Find which vote type this emoji represents
                 vote_type = None
                 for vt_name, vt_id in vote_types.items():
                     if str(vt_id) == str(emoji_id) or (isinstance(vt_id, str) and vt_id == str(reaction.emoji)):
@@ -123,7 +114,6 @@ class Agenda(PluginInterface, PluginHelper):
                         if user.id in staff_members:
                             staff_members[user.id] = vote_type
             
-            # Calculate totals
             total_staff = len(staff_members)
             present = sum(1 for v in staff_members.values() if v is not None)
             
@@ -133,7 +123,6 @@ class Agenda(PluginInterface, PluginHelper):
             
             totals = {vt: len(vote_counts[vt]) for vt in vote_types.keys()}
             
-            # Build response
             resp = []
             resp.append(f"__**{data.guild.name} - Staff Motion Results**__")
             resp.append(f"*Motion date:* `{import_msg.created_at.strftime('%Y-%m-%d %H:%M:%S')}`, *tabulated:* `{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}`")
@@ -150,19 +139,16 @@ class Agenda(PluginInterface, PluginHelper):
             resp.append(f"> {import_msg.content[:500]}")
             resp.append("")
             
-            # Add vote breakdown
             for vote_type in vote_types.keys():
                 count = totals[vote_type]
                 voters = [data.guild.get_member(uid) for uid in vote_counts[vote_type]]
                 voter_names = ", ".join([v.display_name for v in voters if v])
                 resp.append(f"*{vote_type}*: {count} ({voter_names})")
             
-            # Determine result
             if totals['For'] > totals['Against']:
                 resp.append("**Motion passes**")
                 copyres = "Passed"
             elif totals['For'] == totals['Against']:
-                # Tie - check tiebreaker
                 tiebreaker_role_id = config.get('tiebreakerRole', 0)
                 if tiebreaker_role_id:
                     tiebreaker_role = data.guild.get_role(tiebreaker_role_id)
@@ -201,7 +187,6 @@ class Agenda(PluginInterface, PluginHelper):
             resp.append(import_msg.content[:500])
             resp.append("```")
             
-            # Send response (split if too long)
             response_text = "\n".join(resp)
             if len(response_text) > 2000:
                 chunks = [response_text[i:i+2000] for i in range(0, len(response_text), 2000)]

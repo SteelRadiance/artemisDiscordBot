@@ -44,7 +44,6 @@ class Ironreach(PluginInterface, PluginHelper):
             bot.log.info("Not adding ironreach commands on testing.")
             return
         
-        # Only register for specific guild
         bot.eventManager.add_listener(
             EventListener.new()
             .add_command("talkingstick")
@@ -59,14 +58,12 @@ class Ironreach(PluginInterface, PluginHelper):
             .set_callback(Ironreach.voice_chat)
         )
         
-        # Periodic voice chat update
         bot.eventManager.add_listener(
             EventListener.new()
             .set_periodic(60 * 60)
             .set_callback(Ironreach.voice_chat_change)
         )
         
-        # Register agenda config event
         bot.eventManager.add_listener(
             EventListener.new()
             .add_event("agendaPluginConf")
@@ -114,7 +111,6 @@ class Ironreach(PluginInterface, PluginHelper):
             if not guild:
                 return
             
-            # Find empty voice channels in specific category
             category_id = 673383165943087117
             empty_channels = [
                 ch for ch in guild.voice_channels
@@ -124,7 +120,6 @@ class Ironreach(PluginInterface, PluginHelper):
             if not empty_channels:
                 return
             
-            # Load track names from file
             try:
                 tracks_file = Path("data/ironreach.txt")
                 if tracks_file.exists():
@@ -135,7 +130,6 @@ class Ironreach(PluginInterface, PluginHelper):
             except:
                 tracks = ["Track 1", "Track 2", "Track 3"]
             
-            # Assign random track names
             selected_tracks = random.sample(tracks, min(len(empty_channels), len(tracks)))
             
             for channel, track_name in zip(empty_channels, selected_tracks):
@@ -144,7 +138,6 @@ class Ironreach(PluginInterface, PluginHelper):
                 except Exception as e:
                     logger.warning(f"Failed to rename channel {channel.name}: {e}")
             
-            # Update voice-text channel name
             vtc_id = 747227035495170218
             vtc = guild.get_channel(vtc_id)
             if vtc:

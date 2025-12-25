@@ -59,22 +59,18 @@ class AuditLog(PluginInterface, PluginHelper):
             bot.log.info("Not adding audit log monitoring on testing.")
             return
         
-        # Register ready event to load from storage
         bot.eventManager.add_listener(
             EventListener.new()
             .add_event("ready")
             .set_callback(lambda bot_instance: asyncio.create_task(AuditLog.load_from_storage(bot_instance)))
         )
         
-        # Periodic task to fetch new audit log entries (every 10 seconds)
-        # This fetches as often as Discord's API allows while respecting rate limits
         bot.eventManager.add_listener(
             EventListener.new()
-            .set_periodic(10)  # 10 seconds - fetch as often as possible
+            .set_periodic(10)
             .set_callback(AuditLog.fetch_audit_logs)
-        )
+        ) 
         
-        # Command to output all events as JSON
         bot.eventManager.add_listener(
             EventListener.new()
             .add_command("auditlog")
@@ -85,11 +81,10 @@ class AuditLog(PluginInterface, PluginHelper):
     async def load_from_storage(bot):
         """Load existing audit log entries from JSON storage."""
         try:
-            await asyncio.sleep(2)  # Wait for bot to be ready
+            await asyncio.sleep(2)
             
             all_stored = await bot.storage.get_all("audit_log")
             for key, entry_data in all_stored.items():
-                # Parse guild_id from key (format: guild_id_entry_id)
                 parts = key.split('_', 1)
                 if len(parts) == 2:
                     try:
@@ -101,14 +96,13 @@ class AuditLog(PluginInterface, PluginHelper):
                         
                         AuditLog._audit_log_storage[guild_id][entry_id] = entry_data
                         
-                        # Update last entry ID
                         entry_id_int = int(entry_id)
                         if (guild_id not in AuditLog._last_entry_ids or 
                             AuditLog._last_entry_ids[guild_id] is None or
                             entry_id_int > AuditLog._last_entry_ids[guild_id]):
                             AuditLog._last_entry_ids[guild_id] = entry_id_int
                     except ValueError:
-                        continue  # Skip invalid keys
+                        continue
             
             total_entries = sum(len(entries) for entries in AuditLog._audit_log_storage.values())
             if total_entries > 0:
@@ -120,41 +114,33 @@ class AuditLog(PluginInterface, PluginHelper):
     async def fetch_audit_logs(bot):
         """Periodically fetch audit logs for all guilds with rate limiting."""
         try:
-            # Check if we're currently rate limited globally
             if AuditLog._rate_limit_until and datetime.now() < AuditLog._rate_limit_until:
-                return  # Skip this cycle, wait for rate limit to expire
+                return
             
-            # Process guilds with staggered timing to avoid bursts
             now = datetime.now()
             guilds_to_fetch = []
             
             for guild in bot.guilds:
-                # Check if bot has VIEW_AUDIT_LOG permission
                 if not guild.me.guild_permissions.view_audit_log:
                     continue
                 
-                # Check per-guild rate limiting
                 last_fetch = AuditLog._last_fetch_times.get(guild.id)
                 if last_fetch:
                     time_since_fetch = (now - last_fetch).total_seconds()
                     if time_since_fetch < AuditLog.MIN_FETCH_INTERVAL:
-                        continue  # Skip this guild, not enough time has passed
+                        continue
                 
                 guilds_to_fetch.append(guild)
             
-            # Fetch guilds with small delays between them to avoid rate limits
             for i, guild in enumerate(guilds_to_fetch):
                 if i > 0:
-                    # Small delay between guild fetches (0.1 seconds)
                     await asyncio.sleep(0.1)
                 
                 try:
                     await AuditLog.fetch_guild_audit_logs(bot, guild)
                     AuditLog._last_fetch_times[guild.id] = datetime.now()
                 except disnake.HTTPException as e:
-                    # Handle rate limiting (429 status code)
                     if e.status == 429:
-                        # Try to get retry_after from response headers or default to 1 second
                         retry_after = 1.0
                         if hasattr(e, 'response') and e.response:
                             retry_after_header = e.response.headers.get('Retry-After', '1')
@@ -164,7 +150,7 @@ class AuditLog(PluginInterface, PluginHelper):
                                 retry_after = 1.0
                         AuditLog._rate_limit_until = datetime.now() + timedelta(seconds=retry_after)
                         logger.warning(f"Rate limited on audit log fetch. Waiting {retry_after} seconds.")
-                        break  # Stop processing more guilds
+                        break
                     else:
                         logger.warning(f"HTTP error fetching audit logs for guild {guild.name}: {e}")
                 except Exception as e:
@@ -191,24 +177,19 @@ class AuditLog(PluginInterface, PluginHelper):
         changes = []
         
         try:
-            # Build dictionaries from before and after states
             before_dict = {}
             after_dict = {}
             
-            # Iterate over before state (AuditLogDiff is iterable)
             if entry.before:
                 for key, value in entry.before:
                     before_dict[key] = value
             
-            # Iterate over after state (AuditLogDiff is iterable)
             if entry.after:
                 for key, value in entry.after:
                     after_dict[key] = value
             
-            # Combine all keys from both before and after
             all_keys = set(before_dict.keys()) | set(after_dict.keys())
             
-            # Create change entries
             for key in all_keys:
                 old_value = before_dict.get(key)
                 new_value = after_dict.get(key)
@@ -220,7 +201,6 @@ class AuditLog(PluginInterface, PluginHelper):
                 })
         
         except Exception as e:
-            # Log any errors but don't crash
             logger.debug(f"Error extracting changes from audit log entry {entry.id}: {e}")
             return []
         
@@ -236,23 +216,18 @@ class AuditLog(PluginInterface, PluginHelper):
             guild: Guild to fetch audit logs for
         """
         try:
-            # Build limit and before parameters
-            limit = 100  # Maximum allowed by Discord API
+            limit = 100
             before = None
             
-            # If we have a last entry ID, fetch entries before it to get new ones
             if guild.id in AuditLog._last_entry_ids and AuditLog._last_entry_ids[guild.id]:
                 before = disnake.Object(id=AuditLog._last_entry_ids[guild.id])
             
             new_entries_count = 0
             
-            # Fetch audit logs
             async for entry in guild.audit_logs(limit=limit, before=before):
                 entry_id = str(entry.id)
                 
-                # Only store if we haven't seen this entry before
                 if entry_id not in AuditLog._audit_log_storage[guild.id]:
-                    # Convert entry to dictionary for storage
                     entry_data = {
                         'id': entry_id,
                         'guild_id': str(guild.id),
@@ -267,13 +242,11 @@ class AuditLog(PluginInterface, PluginHelper):
                     
                     AuditLog._audit_log_storage[guild.id][entry_id] = entry_data
                     
-                    # Also persist to JSON storage for durability
                     try:
                         await bot.storage.set("audit_log", f"{guild.id}_{entry_id}", entry_data)
                     except Exception as e:
                         logger.warning(f"Failed to persist audit log entry to storage: {e}")
                     
-                    # Update last entry ID (most recent)
                     entry_id_int = int(entry.id)
                     if (guild.id not in AuditLog._last_entry_ids or 
                         AuditLog._last_entry_ids[guild.id] is None or
@@ -289,9 +262,8 @@ class AuditLog(PluginInterface, PluginHelper):
         except disnake.Forbidden:
             logger.warning(f"No permission to view audit logs for guild {guild.name}")
         except disnake.HTTPException as e:
-            # Re-raise HTTP exceptions (including rate limits) to be handled by caller
             if e.status == 429:
-                raise  # Rate limit, let caller handle it
+                raise
             else:
                 logger.error(f"HTTP error fetching audit logs for guild {guild.name}: {e}")
         except Exception as e:
@@ -301,7 +273,6 @@ class AuditLog(PluginInterface, PluginHelper):
     async def output_audit_logs(data):
         """Output all stored audit log events as JSON via DM."""
         try:
-            # Require command to be run in a guild (not DMs)
             if not data.guild:
                 await data.message.channel.send("This command can only be used in a server, not in DMs.")
                 return
@@ -309,22 +280,17 @@ class AuditLog(PluginInterface, PluginHelper):
             guild_id = data.guild.id
             output = {}
             
-            # Only output events for the current guild
             if guild_id in AuditLog._audit_log_storage:
                 output[str(guild_id)] = list(AuditLog._audit_log_storage[guild_id].values())
             else:
-                # No logs for this guild yet
                 output[str(guild_id)] = []
             
             import json
             json_output = json.dumps(output, indent=2, ensure_ascii=False)
             
-            # Try to send via DM
             try:
-                # Get or create DM channel
                 dm_channel = await data.message.author.create_dm()
                 
-                # If JSON is too long, send as file attachment
                 if len(json_output) > 2000:
                     import io
                     file_obj = disnake.File(
@@ -335,11 +301,9 @@ class AuditLog(PluginInterface, PluginHelper):
                 else:
                     await dm_channel.send(f"```json\n{json_output}\n```")
                 
-                # Send confirmation in original channel
                 await data.message.channel.send(f"{data.message.author.mention}, I've sent the audit log to your DMs!")
-                
+            
             except disnake.Forbidden:
-                # User has DMs disabled
                 await data.message.channel.send(
                     f"{data.message.author.mention}, I couldn't send you a DM. "
                     "Please enable DMs from server members to receive the audit log."

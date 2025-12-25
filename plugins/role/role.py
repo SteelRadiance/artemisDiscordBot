@@ -159,7 +159,6 @@ class Role(PluginInterface, PluginHelper):
         try:
             valid_roles = await Role.get_valid_options(data.message.member)
             
-            # Find exact match
             role = None
             for r in valid_roles:
                 if r.name.lower() == role_name.lower():

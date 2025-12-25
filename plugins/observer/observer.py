@@ -101,7 +101,6 @@ class Observer(PluginInterface, PluginHelper):
                 await data.message.channel.send("Malformed command.")
                 return
             
-            # Try channel ID first
             try:
                 channel_id = int(args[1])
                 channel = data.message.guild.get_channel(channel_id)
@@ -112,7 +111,6 @@ class Observer(PluginInterface, PluginHelper):
             except ValueError:
                 pass
             
-            # Try emote ID
             try:
                 emote_id = int(args[1])
                 await Observer.set_report(data.message.guild, emote_id)

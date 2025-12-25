@@ -49,7 +49,7 @@ class GamesBot(PluginInterface, PluginHelper):
             EventListener.new()
             .add_command("gamesbot")
             .add_command("gamebot")
-            .add_command("gb")  # Shortcut: !gb
+            .add_command("gb")
             .set_callback(GamesBot.game_handler)
         )
     
@@ -153,7 +153,6 @@ class GamesBot(PluginInterface, PluginHelper):
             )
             
             if games:
-                # Sort by count, then alphabetically
                 sorted_games = sorted(games.items(), key=lambda x: (-len(x[1]), x[0]))
                 
                 entries = []

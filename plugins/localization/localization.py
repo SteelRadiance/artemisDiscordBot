@@ -59,7 +59,6 @@ class Localization(PluginInterface, PluginHelper):
     async def fetch_timezone(member: disnake.Member) -> str:
         """Fetch user's timezone from storage."""
         try:
-            # Get from storage
             storage = member.guild._state._get_client().storage if hasattr(member.guild._state, '_get_client') else None
             if storage:
                 tz = await storage.get("locale", str(member.id), {})
@@ -91,7 +90,6 @@ class Localization(PluginInterface, PluginHelper):
                     await data.message.reply(embed=embed)
                     return
                 
-                # Store timezone
                 try:
                     storage = data.artemis.storage
                     await storage.set("locale", str(data.message.author.id), {
@@ -137,7 +135,6 @@ class Localization(PluginInterface, PluginHelper):
                 await data.message.reply("Usage: `!time <time>`")
                 return
             
-            # Get user's timezone
             user_tz_str = await Localization.fetch_timezone(data.message.member)
             if not user_tz_str:
                 user_tz_str = "UTC"
@@ -148,7 +145,6 @@ class Localization(PluginInterface, PluginHelper):
                 await data.message.reply(f"I couldn't figure out what time `{time_str}` is :(")
                 return
             
-            # Get timezones of members in channel
             member_timezones = {}
             for member in data.message.channel.members:
                 if not member.bot:
@@ -156,13 +152,11 @@ class Localization(PluginInterface, PluginHelper):
                     if tz:
                         member_timezones[tz] = member_timezones.get(tz, []) + [member]
             
-            # Build embed
             embed = Embed(
                 title="Translated times for users in channel",
                 description="Don't see your timezone? Use the `!timezone` command."
             )
             
-            # Add detected time
             tz_info = f"{parsed_time.tzinfo} ({parsed_time.strftime('%z')})"
             embed.add_field(
                 name="Detected Time",
@@ -174,7 +168,6 @@ class Localization(PluginInterface, PluginHelper):
                 inline=False
             )
             
-            # Add times for each timezone
             lines = []
             for tz_name in sorted(member_timezones.keys()):
                 tz = pytz.timezone(tz_name)

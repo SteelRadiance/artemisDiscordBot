@@ -25,7 +25,6 @@ class PluginLoader:
         Args:
             plugins_dir: Directory containing plugin modules (relative to project root)
         """
-        # Resolve path relative to project root (where main.py is)
         project_root = Path(__file__).parent.parent.parent
         self.plugins_dir = project_root / plugins_dir
         self.loaded_plugins: List[Type[PluginInterface]] = []
@@ -46,32 +45,25 @@ class PluginLoader:
         
         logger.info(f"Discovering plugins in: {self.plugins_dir}")
         
-        # Find all plugin modules
         for plugin_dir in self.plugins_dir.iterdir():
             if not plugin_dir.is_dir():
                 continue
             
             logger.debug(f"Checking plugin directory: {plugin_dir.name}")
             
-            # Try importing the plugin module (plugins.plugin_name)
-            # This will work whether __init__.py imports from the main file or not
             module_name = f"plugins.{plugin_dir.name}"
             
             try:
                 module = importlib.import_module(module_name)
                 logger.debug(f"Imported module: {module_name}")
                 
-                # Find PluginInterface classes in this module
-                # Classes might be imported from submodules (e.g., __init__.py imports from plugin.py)
                 for name, obj in inspect.getmembers(module, inspect.isclass):
                     if (issubclass(obj, PluginInterface) and 
                         obj != PluginInterface):
-                        # Check if class is defined in this module or imported from a submodule
-                        # Allow classes from submodules of the same plugin directory
                         obj_module = obj.__module__
                         if (obj_module == module.__name__ or 
                             obj_module.startswith(f"{module.__name__}.")):
-                            if obj not in plugins:  # Avoid duplicates
+                            if obj not in plugins:
                                 plugins.append(obj)
                                 logger.info(f"Discovered plugin: {name} from {obj_module} (via {module_name})")
                 

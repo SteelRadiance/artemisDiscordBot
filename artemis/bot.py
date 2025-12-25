@@ -39,35 +39,27 @@ class ArtemisBot(commands.Bot):
         Args:
             config: Configuration object
         """
-        # Bot configuration
         self.config = config
         
-        # Initialize disnake Bot
         intents = disnake.Intents.default()
         intents.message_content = True
         super().__init__(
             command_prefix=config.COMMAND_PREFIX,
             intents=intents,
-            help_command=None  # We'll implement custom help
+            help_command=None
         )
         
-        # Initialize storage
         storage_dir = getattr(config, 'STORAGE_DIR', 'storage')
         self.storage = JSONStore(storage_dir)
         
-        # Initialize event manager
         self.eventManager = EventManager(self)
         
-        # Initialize plugin loader
         self.plugin_loader = PluginLoader("plugins")
         
-        # Initialize command parser
         self.command_parser = CommandParser(config.COMMAND_PREFIX)
         
-        # Expose logger as bot.log for plugin compatibility
         self.log = logger
         
-        # Startup time
         import time
         self.startup_time = time.time()
         
@@ -75,7 +67,6 @@ class ArtemisBot(commands.Bot):
     
     async def setup_hook(self):
         """Called when the bot is about to connect to Discord."""
-        # Set status to busy (dnd) during startup
         await self.change_presence(status=disnake.Status.dnd, activity=None)
         logger.info("Bot connecting - status set to busy")
     
@@ -84,22 +75,17 @@ class ArtemisBot(commands.Bot):
         logger.info(f"Bot is ready! Logged in as {self.user}")
         logger.info(f"Connected to {len(self.guilds)} guilds")
         
-        # Set bot status to online and apply configured activity
         await self._set_status()
         
-        # Start periodic tasks
         self.eventManager.start_periodic_tasks()
         
-        # Dispatch ready event
         await self.eventManager.dispatch_event("ready", self)
     
     async def _set_status(self):
         """Set the bot's presence status to online with configured activity."""
-        # Always set status to online when ready
         activity_type = getattr(self.config, 'BOT_ACTIVITY_TYPE', None)
         activity_text = getattr(self.config, 'BOT_ACTIVITY_TEXT', None)
         
-        # Create activity if configured
         activity = None
         if activity_type and activity_text:
             activity_type_map = {
@@ -112,14 +98,12 @@ class ArtemisBot(commands.Bot):
             
             activity_type_enum = activity_type_map.get(activity_type.lower(), disnake.ActivityType.playing)
             
-            # For streaming, we need a URL
             if activity_type_enum == disnake.ActivityType.streaming:
                 stream_url = getattr(self.config, 'BOT_STREAM_URL', 'https://twitch.tv')
                 activity = disnake.Streaming(name=activity_text, url=stream_url)
             else:
                 activity = disnake.Activity(type=activity_type_enum, name=activity_text)
         
-        # Set the presence to online
         await self.change_presence(status=disnake.Status.online, activity=activity)
         
         if activity:
@@ -130,15 +114,12 @@ class ArtemisBot(commands.Bot):
     
     async def on_message(self, message: disnake.Message):
         """Handle incoming messages."""
-        # Ignore bot messages
         if message.author.bot:
             return
         
-        # Parse for prefix commands (using custom command system)
         parsed = self.command_parser.parse(message.content)
         if parsed:
             logger.info(f"Parsed command: '{parsed.command}' from message: '{message.content}'")
-            # Create event data
             event_data = EventData(
                 message=message,
                 guild=message.guild,
@@ -146,12 +127,10 @@ class ArtemisBot(commands.Bot):
                 artemis=self
             )
             
-            # Dispatch command event
             await self.eventManager.dispatch_command(parsed.command, event_data)
         else:
             logger.debug(f"Message did not parse as command: {message.content}")
         
-        # Dispatch message event
         await self.eventManager.dispatch_event("message", EventData(
             message=message,
             guild=message.guild,
@@ -176,10 +155,18 @@ class ArtemisBot(commands.Bot):
     
     def run(self) -> None:
         """Run the bot."""
-        # Load plugins before starting
         self.load_plugins()
         
-        # Start bot
+        # Check if this is a restart - if so, wait 2 seconds before connecting
+        import os
+        if os.getenv('ARTEMIS_RESTART') == '1':
+            logger.info("Restart detected - waiting 2 seconds before connecting to Discord...")
+            import time
+            time.sleep(2)
+            # Clear the environment variable so it doesn't affect future starts
+            os.environ.pop('ARTEMIS_RESTART', None)
+            logger.info("Resuming startup...")
+        
         token = self.config.BOT_TOKEN
         if not token or token == "your-bot-token-here":
             logger.error("Bot token not configured! Please set BOT_TOKEN in config/config.py")
@@ -191,17 +178,14 @@ class ArtemisBot(commands.Bot):
         """Cleanup on shutdown."""
         logger.info("Shutting down...")
         
-        # Set status to offline before shutting down
         try:
             await self.change_presence(status=disnake.Status.invisible, activity=None)
             logger.info("Set bot status to offline")
         except Exception as e:
             logger.warning(f"Failed to set offline status: {e}")
         
-        # Stop periodic tasks
         self.eventManager.stop_periodic_tasks()
         
-        # Close disnake connection
         await super().close()
         
         logger.info("Bot shutdown complete")

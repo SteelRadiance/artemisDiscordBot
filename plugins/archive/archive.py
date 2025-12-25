@@ -64,13 +64,11 @@ class Archive(PluginInterface, PluginHelper):
                 await data.message.reply("Usage: `!archive <channel_mention>`")
                 return
             
-            # Parse channel
             channel = Archive.channel_mention(channel_text, data.message.guild)
             if not channel:
                 await data.message.reply("Could not find that channel.")
                 return
             
-            # Check permissions
             if not channel.permissions_for(data.guild.me).view_channel:
                 await data.message.channel.send("I don't have read access to that channel!")
                 return
@@ -88,10 +86,8 @@ class Archive(PluginInterface, PluginHelper):
             async for message in channel.history(limit=None):
                 messages.append(message)
             
-            # Sort by ID (chronological)
             messages.sort(key=lambda m: m.id)
             
-            # Encode messages
             payload = {
                 "_version": Archive.ARCHIVER_VERSION,
                 "_retrieval": {
@@ -158,7 +154,6 @@ class Archive(PluginInterface, PluginHelper):
             json_data = json.dumps(payload, indent=2, ensure_ascii=False)
             fname = f"{channel.id}_{channel.name}.json"
             
-            # Create temp directory
             temp_dir = Path("temp")
             temp_dir.mkdir(exist_ok=True)
             

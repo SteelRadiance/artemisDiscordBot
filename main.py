@@ -16,8 +16,6 @@ from artemis.utils.logging import setup_logging
 import logging
 
 if __name__ == "__main__":
-    # Setup logging first
-    # Check for log file path in config, default to logs/artemis.log
     log_level = "INFO"
     log_file = "logs/artemis.log"
     
@@ -26,9 +24,8 @@ if __name__ == "__main__":
         log_level = getattr(config, 'LOG_LEVEL', log_level)
         log_file = getattr(config, 'LOG_FILE', log_file)
     except ImportError:
-        pass  # Config not loaded yet, use defaults
+        pass
     
-    # Create logs directory if it doesn't exist
     if log_file:
         os.makedirs(os.path.dirname(log_file) if os.path.dirname(log_file) else '.', exist_ok=True)
     
@@ -43,7 +40,6 @@ if __name__ == "__main__":
             logger.error("Configuration not found! Please copy config/config.example.py to config/config.py and configure it.")
             sys.exit(1)
         
-        # Create and start bot
         bot = ArtemisBot(config)
         bot.run()
     except KeyboardInterrupt:

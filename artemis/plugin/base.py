@@ -102,25 +102,21 @@ class PluginHelper:
         
         text = text.strip()
         
-        # Try mention format <@123456789> or <@!123456789>
         mention_match = re.match(r'<@!?(\d+)>', text)
         if mention_match:
             user_id = int(mention_match.group(1))
             member = guild.get_member(user_id)
             if not member:
-                # Try fetching if not in cache
                 try:
                     member = await guild.fetch_member(user_id)
                 except (disnake.NotFound, disnake.HTTPException):
                     pass
             return member
         
-        # Try user ID
         try:
             user_id = int(text)
             member = guild.get_member(user_id)
             if not member:
-                # Try fetching if not in cache
                 try:
                     member = await guild.fetch_member(user_id)
                 except (disnake.NotFound, disnake.HTTPException):
@@ -129,26 +125,22 @@ class PluginHelper:
         except ValueError:
             pass
         
-        # Try username#discriminator format (legacy Discord format)
         if '#' in text:
             username, discriminator = text.rsplit('#', 1)
             for member in guild.members:
                 if member.name == username and member.discriminator == discriminator:
                     return member
         
-        # Try username or display name (case-insensitive, partial match)
         text_lower = text.lower()
         matches = []
         for member in guild.members:
             if (member.name.lower() == text_lower or 
                 (member.display_name and member.display_name.lower() == text_lower)):
-                return member  # Exact match
-            # Partial matches for better search
+                return member
             if (member.name.lower().startswith(text_lower) or 
                 (member.display_name and member.display_name.lower().startswith(text_lower))):
                 matches.append(member)
         
-        # Return first partial match if found
         if matches:
             return matches[0]
         
@@ -171,20 +163,17 @@ class PluginHelper:
         
         text = text.strip()
         
-        # Try mention format <@&123456789>
         mention_match = re.match(r'<@&(\d+)>', text)
         if mention_match:
             role_id = int(mention_match.group(1))
             return guild.get_role(role_id)
         
-        # Try role ID
         try:
             role_id = int(text)
             return guild.get_role(role_id)
         except ValueError:
             pass
         
-        # Try role name
         text_lower = text.lower()
         for role in guild.roles:
             if role.name.lower() == text_lower:
@@ -249,7 +238,6 @@ class PluginHelper:
             result = now + delta
             return result
         
-        # Try absolute time parsing
         try:
             parsed = date_parser.parse(time_str, default=now)
             if parsed.tzinfo is None:
@@ -270,7 +258,6 @@ class PluginHelper:
         Returns:
             Message if found, None otherwise
         """
-        # Extract message ID from URL or use as-is
         message_id_match = re.search(r'/(\d+)/(\d+)/(\d+)', text)
         if message_id_match:
             guild_id = int(message_id_match.group(1))
@@ -279,8 +266,6 @@ class PluginHelper:
         else:
             try:
                 msg_id = int(text)
-                # Need guild and channel context - this is simplified
-                # In practice, you'd need to search across channels
                 return None
             except ValueError:
                 return None

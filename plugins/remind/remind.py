@@ -53,7 +53,6 @@ class Remind(PluginInterface, PluginHelper):
             .set_callback(Remind.remind_me)
         )
         
-        # Periodic reminder check
         bot.eventManager.add_listener(
             EventListener.new()
             .set_periodic(10)
@@ -77,7 +76,6 @@ class Remind(PluginInterface, PluginHelper):
             if not text:
                 text = "*No reminder message left*"
             
-            # Get user's timezone
             from plugins.localization.localization import Localization
             user_tz_str = await Localization.fetch_timezone(data.message.member)
             if not user_tz_str:
@@ -89,14 +87,11 @@ class Remind(PluginInterface, PluginHelper):
                 await data.message.reply(f"I couldn't figure out what time `{time_str}` is :(")
                 return
             
-            # Generate reminder ID
             import time
             reminder_id = f"{int(time.time() * 1000)}"
             
-            # Store reminder
             await Remind.add_reminder(data, parsed_time, text, reminder_id)
             
-            # Create embed
             embed = Embed(
                 title="Reminder added",
                 description=text,
@@ -215,14 +210,12 @@ class Remind(PluginInterface, PluginHelper):
             
             channel = bot.get_channel(channel_id)
             if not channel:
-                # Try DM
                 user = bot.get_user(member_id)
                 if user:
                     channel = await user.create_dm()
                 else:
                     return
             
-            # Get original message timestamp
             try:
                 if isinstance(channel, disnake.TextChannel):
                     orig_msg = await channel.fetch_message(message_id)

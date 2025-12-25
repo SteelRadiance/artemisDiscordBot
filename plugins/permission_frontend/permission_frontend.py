@@ -147,7 +147,6 @@ class PermissionFrontend(PluginInterface, PluginHelper):
             
             permission = args[0]
             
-            # Parse options (simplified - full implementation would use argparse)
             allow = True
             scope = "guild"
             target = "all"
@@ -177,12 +176,10 @@ class PermissionFrontend(PluginInterface, PluginHelper):
                     target = "evalusers"
                 i += 1
             
-            # Validate scope
             if scope not in ["global", "guild", "channel"]:
                 await data.message.reply("Invalid scope. Must be global, guild, or channel.")
                 return
             
-            # Determine setting
             if scope == "global":
                 setting = PermissionFrontend.SETTING_GLOBAL
                 setting_value = 0
@@ -193,7 +190,6 @@ class PermissionFrontend(PluginInterface, PluginHelper):
                 setting = PermissionFrontend.SETTING_CHANNEL
                 setting_value = data.message.channel.id
             
-            # Determine target
             target_type = PermissionFrontend.TARGET_GLOBAL
             if target == "role":
                 role = PermissionFrontend.parse_role(data.guild, target_value)
@@ -216,7 +212,6 @@ class PermissionFrontend(PluginInterface, PluginHelper):
                 target_type = PermissionFrontend.TARGET_BOTADMIN
                 target_value = 0
             
-            # Check if user can modify this permission
             can_modify = await PermissionFrontend.has_permission_permission(
                 setting, target_type, data
             )
@@ -225,7 +220,6 @@ class PermissionFrontend(PluginInterface, PluginHelper):
                 await data.message.reply("You don't have permission to modify this permission.")
                 return
             
-            # Store permission
             perm_key = f"{permission}_{setting}_{setting_value}_{target_type}_{target_value}"
             await data.artemis.storage.set("permissions", perm_key, {
                 "permission": permission,
