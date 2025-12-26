@@ -162,6 +162,9 @@ class Management(PluginInterface, PluginHelper):
     async def info(data):
         """Handle info command."""
         try:
+            args = Management.split_command(data.message.content)
+            show_dependencies = "-dependencies" in args
+            
             embed = Embed(title="Artemis Bot Information")
             
             import psutil
@@ -219,19 +222,20 @@ class Management(PluginInterface, PluginHelper):
                 else:
                     embed.add_field(name="Loaded Plugins", value=plugins_text, inline=False)
             
-            deps = Management.get_dependencies()
-            if deps:
-                deps_text = "\n".join([f"{name} ({version})" for name, version in deps.items()])
-                if len(deps_text) > 1024:
-                    chunks = [deps_text[i:i+1024] for i in range(0, len(deps_text), 1024)]
-                    for i, chunk in enumerate(chunks):
-                        embed.add_field(
-                            name="Dependencies" if i == 0 else "Dependencies (cont.)",
-                            value=chunk,
-                            inline=False
-                        )
-                else:
-                    embed.add_field(name="Dependencies", value=deps_text, inline=False)
+            if show_dependencies:
+                deps = Management.get_dependencies()
+                if deps:
+                    deps_text = "\n".join([f"{name} ({version})" for name, version in deps.items()])
+                    if len(deps_text) > 1024:
+                        chunks = [deps_text[i:i+1024] for i in range(0, len(deps_text), 1024)]
+                        for i, chunk in enumerate(chunks):
+                            embed.add_field(
+                                name="Dependencies" if i == 0 else "Dependencies (cont.)",
+                                value=chunk,
+                                inline=False
+                            )
+                    else:
+                        embed.add_field(name="Dependencies", value=deps_text, inline=False)
             
             await data.message.channel.send(embed=embed)
         except Exception as e:
@@ -492,14 +496,31 @@ class Management(PluginInterface, PluginHelper):
     def git_version() -> str:
         """Get git version/commit."""
         try:
+            project_root = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
             result = subprocess.run(
                 ['git', 'rev-parse', 'HEAD'],
                 capture_output=True,
                 text=True,
-                cwd=os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
+                cwd=project_root
             )
             commit = result.stdout.strip()
-            return f"[{commit[:7]}](https://github.com/artemis/commit/{commit})"
+            
+            remote_result = subprocess.run(
+                ['git', 'remote', 'get-url', 'origin'],
+                capture_output=True,
+                text=True,
+                cwd=project_root
+            )
+            remote_url = remote_result.stdout.strip()
+            
+            if remote_url.startswith('git@github.com:'):
+                repo = remote_url.replace('git@github.com:', '').replace('.git', '')
+            elif remote_url.startswith('https://github.com/'):
+                repo = remote_url.replace('https://github.com/', '').replace('.git', '')
+            else:
+                repo = 'SteelRadiance/artemisDiscordBot'
+            
+            return f"[{commit[:7]}](https://github.com/{repo}/commit/{commit})"
         except:
             return "unknown"
     
