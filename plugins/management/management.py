@@ -15,6 +15,9 @@ Commands:
     # !restart - Restart the bot (admin only) - DISABLED
     # !update - Pull latest code from git (admin only) - DISABLED
     !invite - Generate bot invite URL
+    !talkingstick - Request the talking stick (notifies staff)
+    !talkingstick role <role_id> - Set staff role for talking stick (admin only)
+    !vc - Manually trigger voice channel name changes
 
 Features:
     - Ping measurement using Discord snowflake timestamps
@@ -22,6 +25,8 @@ Features:
     - Plugin listing with emoji-based version hashes
     - Dependency version display
     - OAuth invite URL generation with proper permissions
+    - Talking stick: Relays requests to staff using observer channel and configurable staff role
+    - Voice channel naming: Automatically renames empty voice channels with names from data files
 """
 
 import time
@@ -31,6 +36,9 @@ import subprocess
 import asyncio
 import importlib.metadata
 from datetime import datetime, timedelta
+from typing import Optional
+from pathlib import Path
+import random
 import logging
 
 import disnake
@@ -99,6 +107,26 @@ class Management(PluginInterface, PluginHelper):
             .add_command("help")
             .set_callback(Management.help)
             .set_help("**Usage**: `!help`\n\nLists all commands available to you, organized by category with descriptions.")
+        )
+        
+        bot.eventManager.add_listener(
+            EventListener.new()
+            .add_command("talkingstick")
+            .set_callback(Management.talkingstick)
+            .set_help("**Usage**: `!talkingstick` or `!talkingstick role <role_id>`\n\nRequest the talking stick (notifies staff). Admins can use `!talkingstick role <role_id>` to set the staff role to ping.")
+        )
+        
+        bot.eventManager.add_listener(
+            EventListener.new()
+            .add_command("vc")
+            .set_callback(Management.voice_chat)
+            .set_help("**Usage**: `!vc`\n\nManually trigger voice channel name changes. Requires permission `p.management.changevc`.")
+        )
+        
+        bot.eventManager.add_listener(
+            EventListener.new()
+            .set_periodic(60 * 60)
+            .set_callback(Management.voice_chat_change)
         )
         
         bot.eventManager.add_listener(
@@ -357,8 +385,8 @@ class Management(PluginInterface, PluginHelper):
                 "perm": (None, True, "Check or manage permissions (short)", "Permission"),
                 "hpm": (None, True, "Check or manage permissions (short)", "Permission"),
                 
-                "talkingstick": (None, True, "Request talking stick", "Ironreach"),
-                "vc": ("p.ironreach.changevc", False, "Change voice channel name", "Ironreach"),
+                "talkingstick": (None, True, "Request talking stick", "Management"),
+                "vc": ("p.management.changevc", False, "Change voice channel name", "Management"),
             }
             
             all_commands = set(data.artemis.eventManager.command_listeners.keys())
@@ -489,3 +517,189 @@ class Management(PluginInterface, PluginHelper):
             return deps
         except:
             return {}
+    
+    @staticmethod
+    async def get_staff_role_id(guild: disnake.Guild) -> Optional[int]:
+        """Get the configured staff role ID for talking stick."""
+        try:
+            storage = guild._state._get_client().storage if hasattr(guild._state, '_get_client') else None
+            if not storage:
+                return None
+            
+            info = await storage.get("talkingstick", str(guild.id))
+            if info and isinstance(info, dict) and info.get("staff_role_id"):
+                return int(info["staff_role_id"])
+            return None
+        except:
+            return None
+    
+    @staticmethod
+    async def set_staff_role(guild: disnake.Guild, role_id: int):
+        """Set the staff role ID for talking stick."""
+        try:
+            storage = guild._state._get_client().storage if hasattr(guild._state, '_get_client') else None
+            if not storage:
+                return False
+            
+            await storage.set("talkingstick", str(guild.id), {
+                "guild_id": str(guild.id),
+                "staff_role_id": str(role_id)
+            })
+            return True
+        except Exception as e:
+            logger.error(f"Failed to set staff role: {e}")
+            return False
+    
+    @staticmethod
+    async def get_observer_channel(guild: disnake.Guild) -> Optional[disnake.TextChannel]:
+        """Get the observer channel for this guild."""
+        try:
+            from plugins.observer.observer import Observer
+            info = await Observer.get_info(guild)
+            if info and info.get("channel_id"):
+                channel = guild.get_channel(int(info["channel_id"]))
+                return channel
+            return None
+        except Exception as e:
+            logger.error(f"Failed to get observer channel: {e}")
+            return None
+    
+    @staticmethod
+    async def talkingstick(data):
+        """Handle talking stick command."""
+        try:
+            if not data.guild:
+                await data.message.reply("This command can only be used in a server.")
+                return
+            
+            args = Management.split_command(data.message.content)
+            
+            # Check if this is a config command (role flag)
+            if len(args) > 1 and args[1].lower() == "role":
+                # Admin-only configuration
+                admin_ids = getattr(data.artemis.config, 'ADMIN_USER_IDS', [])
+                if str(data.message.author.id) not in admin_ids:
+                    await Management.unauthorized(data.message)
+                    return
+                
+                if len(args) < 3:
+                    await data.message.reply("Usage: `!talkingstick role <role_id>` or `!talkingstick role @Role`")
+                    return
+                
+                # Parse role
+                role_id = None
+                try:
+                    role_id = int(args[2])
+                except ValueError:
+                    # Try to parse as role mention or name
+                    role = Management.parse_role(data.guild, args[2])
+                    if not role:
+                        await data.message.reply("Role not found. Use a role ID, mention (@Role), or role name.")
+                        return
+                    role_id = role.id
+                
+                # Verify role exists
+                role = data.guild.get_role(role_id)
+                if not role:
+                    await data.message.reply("Role not found.")
+                    return
+                
+                # Save the role
+                if await Management.set_staff_role(data.guild, role_id):
+                    await data.message.reply(f"✅ Staff role set to {role.mention} for talking stick notifications.")
+                else:
+                    await data.message.reply("❌ Failed to save staff role configuration.")
+                return
+            
+            # Get observer channel (same channel observer uses)
+            observer_channel = await Management.get_observer_channel(data.guild)
+            if not observer_channel:
+                await data.message.reply("⚠️ Talking stick is not configured. An admin needs to set up the observer channel first using `!observer <channel_id>`.")
+                return
+            
+            # Get staff role
+            staff_role_id = await Management.get_staff_role_id(data.guild)
+            if not staff_role_id:
+                await data.message.reply("⚠️ No staff role configured. An admin needs to set one using `!talkingstick role <role_id>`.")
+                return
+            
+            staff_role = data.guild.get_role(staff_role_id)
+            if not staff_role:
+                await data.message.reply("⚠️ Configured staff role no longer exists. An admin needs to reconfigure it.")
+                return
+            
+            # Send notification to observer channel
+            member = data.guild.get_member(data.message.author.id) if data.guild else None
+            member_mention = member.mention if member else data.message.author.mention
+            
+            await observer_channel.send(
+                f"{staff_role.mention}: {member_mention} has asked for the talking stick!"
+            )
+            
+            await data.message.channel.send("Your request to get the Talking Stick has been relayed to staff.")
+            await data.message.delete()
+        except Exception as e:
+            await Management.exception_handler(data.message, e)
+    
+    @staticmethod
+    async def voice_chat(data):
+        """Handle voice chat command."""
+        try:
+            p = Permission("p.management.changevc", data.artemis, False)
+            p.add_message_context(data.message)
+            if not await p.resolve():
+                await p.send_unauthorized_message(data.message.channel)
+                return
+            
+            await Management.voice_chat_change(data.artemis)
+            await data.message.add_reaction("😤")
+        except Exception as e:
+            await Management.exception_handler(data.message, e)
+    
+    @staticmethod
+    async def voice_chat_change(bot):
+        """Change voice channel names."""
+        try:
+            # This is a generic implementation - can be customized per guild if needed
+            for guild in bot.guilds:
+                # Skip if no voice channels
+                if not guild.voice_channels:
+                    continue
+                
+                # Find empty voice channels (can be customized per guild)
+                empty_channels = [
+                    ch for ch in guild.voice_channels
+                    if len(ch.members) == 0
+                ]
+                
+                if not empty_channels:
+                    continue
+                
+                # Try to load track names from data file (guild-specific or generic)
+                tracks = []
+                tracks_file = Path(f"data/{guild.id}.txt")
+                if not tracks_file.exists():
+                    tracks_file = Path("data/voice_channels.txt")
+                if not tracks_file.exists():
+                    tracks_file = Path("data/ironreach.txt")  # Fallback to ironreach
+                
+                try:
+                    if tracks_file.exists():
+                        with open(tracks_file, 'r', encoding='utf-8') as f:
+                            tracks = [line.strip() for line in f if line.strip()]
+                except:
+                    pass
+                
+                if not tracks:
+                    # Skip if no track names available
+                    continue
+                
+                selected_tracks = random.sample(tracks, min(len(empty_channels), len(tracks)))
+                
+                for channel, track_name in zip(empty_channels, selected_tracks):
+                    try:
+                        await channel.edit(name=track_name)
+                    except Exception as e:
+                        logger.warning(f"Failed to rename channel {channel.name} in {guild.name}: {e}")
+        except Exception as e:
+            logger.error(f"Error in voice_chat_change: {e}")

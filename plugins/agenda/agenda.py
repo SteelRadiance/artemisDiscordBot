@@ -33,12 +33,12 @@ class Agenda(PluginInterface, PluginHelper):
     """Agenda plugin for voting tally."""
     
     CONF_TPL = {
-        'staffRole': 0,
-        'tiebreakerRole': 0,
+        'staffRole': 741883050278912050,
+        'tiebreakerRole': 766785052163571734,
         'quorum': 2/3,
         'voteTypes': {
-            "For": 394653535863570442,
-            "Against": 394653616050405376,
+            "For": 747168156866314282,
+            "Against": 747168184246861914,
             "Abstain": "👀",
             "Absent": None,
         },
