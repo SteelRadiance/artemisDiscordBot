@@ -456,7 +456,12 @@ class Management(PluginInterface, PluginHelper):
             
             embed.set_footer(text=f"Use !help to see this list again. Prefix: {data.artemis.config.COMMAND_PREFIX}")
             
-            await data.message.reply(embed=embed)
+            try:
+                dm_channel = await data.message.author.create_dm()
+                await dm_channel.send(embed=embed)
+                await data.message.reply("📬 I've sent the command list to your DMs!")
+            except:
+                await data.message.reply(embed=embed)
         except Exception as e:
             await Management.exception_handler(data.message, e, True)
     
@@ -636,7 +641,12 @@ class Management(PluginInterface, PluginHelper):
                 f"{staff_role.mention}: {member_mention} has asked for the talking stick!"
             )
             
-            await data.message.channel.send("Your request to get the Talking Stick has been relayed to staff.")
+            try:
+                dm_channel = await data.message.author.create_dm()
+                await dm_channel.send("Your request to get the Talking Stick has been relayed to staff.")
+            except:
+                await data.message.channel.send("Your request to get the Talking Stick has been relayed to staff.")
+            
             await data.message.delete()
         except Exception as e:
             await Management.exception_handler(data.message, e)
