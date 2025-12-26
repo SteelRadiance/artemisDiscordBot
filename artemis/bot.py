@@ -43,6 +43,8 @@ class ArtemisBot(commands.Bot):
         
         intents = disnake.Intents.default()
         intents.message_content = True
+        intents.members = True  # Required to track member joins/leaves/updates
+        intents.guilds = True  # Required to track guild events
         super().__init__(
             command_prefix=config.COMMAND_PREFIX,
             intents=intents,
@@ -76,6 +78,10 @@ class ArtemisBot(commands.Bot):
         logger.info(f"Connected to {len(self.guilds)} guilds")
         
         await self._set_status()
+        
+        # Load all members for all guilds
+        logger.info("Loading all members for all guilds...")
+        await self._chunk_all_guilds()
         
         self.eventManager.start_periodic_tasks()
         
@@ -141,10 +147,58 @@ class ArtemisBot(commands.Bot):
     async def on_guild_join(self, guild: disnake.Guild):
         """Handle guild join."""
         logger.info(f"Joined guild: {guild.name} ({guild.id})")
+        
+        # Load all members for the newly joined guild
+        logger.info(f"Loading all members for guild {guild.name} ({guild.id})...")
+        await self._chunk_guild(guild)
+        
         await self.eventManager.dispatch_event("guildCreate", EventData(
             guild=guild,
             artemis=self
         ))
+    
+    async def on_member_join(self, member: disnake.Member):
+        """Handle member join - member is automatically cached by Discord."""
+        logger.debug(f"Member {member.name}#{member.discriminator} joined guild {member.guild.name}")
+        # Member is automatically cached when they join, no action needed
+    
+    async def on_member_remove(self, member: disnake.Member):
+        """Handle member leave - member will be removed from cache automatically."""
+        logger.debug(f"Member {member.name}#{member.discriminator} left guild {member.guild.name}")
+        # Member will be automatically removed from cache, no action needed
+    
+    async def on_member_update(self, before: disnake.Member, after: disnake.Member):
+        """Handle member update (e.g., role changes) - member is already in cache."""
+        # Check if roles changed
+        if before.roles != after.roles:
+            logger.debug(f"Member {after.name}#{after.discriminator} roles updated in guild {after.guild.name}")
+            # Member is already in cache, roles are automatically updated
+    
+    async def _chunk_all_guilds(self):
+        """Chunk (load) all members for all guilds."""
+        for guild in self.guilds:
+            await self._chunk_guild(guild)
+    
+    async def _chunk_guild(self, guild: disnake.Guild):
+        """Chunk (load) all members for a specific guild."""
+        try:
+            # Check if we need to chunk
+            cached_count = len(guild.members)
+            server_count = guild.member_count or cached_count
+            
+            # Only chunk if we're missing a significant number of members
+            # or if the guild is small enough that we can chunk quickly
+            if cached_count < server_count * 0.9 or server_count < 1000:
+                logger.info(f"Chunking guild {guild.name} ({guild.id}): {cached_count}/{server_count} members cached")
+                try:
+                    await guild.chunk()
+                    logger.info(f"Successfully loaded all members for guild {guild.name} ({guild.id}): {len(guild.members)} members")
+                except Exception as e:
+                    logger.warning(f"Failed to chunk guild {guild.name} ({guild.id}): {e}")
+            else:
+                logger.debug(f"Guild {guild.name} ({guild.id}) already has {cached_count}/{server_count} members cached, skipping chunk")
+        except Exception as e:
+            logger.error(f"Error chunking guild {guild.name} ({guild.id}): {e}")
     
     def load_plugins(self) -> None:
         """Load all plugins."""
@@ -158,14 +212,14 @@ class ArtemisBot(commands.Bot):
         self.load_plugins()
         
         # Check if this is a restart - if so, wait 2 seconds before connecting
-        import os
-        if os.getenv('ARTEMIS_RESTART') == '1':
-            logger.info("Restart detected - waiting 2 seconds before connecting to Discord...")
-            import time
-            time.sleep(2)
-            # Clear the environment variable so it doesn't affect future starts
-            os.environ.pop('ARTEMIS_RESTART', None)
-            logger.info("Resuming startup...")
+        # import os
+        # if os.getenv('ARTEMIS_RESTART') == '1':
+        #     logger.info("Restart detected - waiting 2 seconds before connecting to Discord...")
+        #     import time
+        #     time.sleep(2)
+        #     # Clear the environment variable so it doesn't affect future starts
+        #     os.environ.pop('ARTEMIS_RESTART', None)
+        #     logger.info("Resuming startup...")
         
         token = self.config.BOT_TOKEN
         if not token or token == "your-bot-token-here":

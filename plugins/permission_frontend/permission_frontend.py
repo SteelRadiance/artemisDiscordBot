@@ -114,7 +114,7 @@ class PermissionFrontend(PluginInterface, PluginHelper):
             user_text = args[1] if len(args) > 1 else "@self"
             
             if user_text == "@self":
-                member = data.message.member
+                member = data.guild.get_member(data.message.author.id) if data.guild else None
             else:
                 member = await PermissionFrontend.parse_guild_user(data.guild, user_text)
             
@@ -262,9 +262,15 @@ class PermissionFrontend(PluginInterface, PluginHelper):
         if setting == PermissionFrontend.SETTING_GLOBAL or target == PermissionFrontend.TARGET_BOTADMIN:
             return is_admin
         elif setting == PermissionFrontend.SETTING_GUILD:
-            is_owner = data.message.member.id == data.guild.owner_id
-            is_guild_admin = data.message.member.guild_permissions.administrator
+            member = data.guild.get_member(data.message.author.id) if data.guild else None
+            if not member:
+                return False
+            is_owner = member.id == data.guild.owner_id
+            is_guild_admin = member.guild_permissions.administrator
             return is_admin or is_owner or is_guild_admin
         elif setting == PermissionFrontend.SETTING_CHANNEL:
-            return data.message.member.permissions_in(data.message.channel).manage_channels or is_admin
+            member = data.guild.get_member(data.message.author.id) if data.guild else None
+            if not member:
+                return False
+            return member.permissions_in(data.message.channel).manage_channels or is_admin
         return False

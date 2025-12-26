@@ -19,6 +19,11 @@ Features:
 """
 
 import logging
+import json
+import aiofiles
+import aiofiles.os
+from pathlib import Path
+from typing import Dict, Any
 import disnake
 from disnake import Embed
 from difflib import SequenceMatcher
@@ -32,6 +37,41 @@ logger = logging.getLogger("artemis.plugin.role")
 
 class Role(PluginInterface, PluginHelper):
     """Role plugin for role self-management."""
+    
+    @staticmethod
+    def _get_roles_file() -> Path:
+        """Get the roles file path in logs directory."""
+        return Path("logs") / "roles.json"
+    
+    @staticmethod
+    async def _load_roles() -> Dict[str, Any]:
+        """Load all roles from the roles file."""
+        roles_file = Role._get_roles_file()
+        try:
+            if await aiofiles.os.path.exists(roles_file):
+                async with aiofiles.open(roles_file, 'r', encoding='utf-8') as f:
+                    content = await f.read()
+                    if content.strip():
+                        return json.loads(content)
+            return {}
+        except Exception as e:
+            logger.error(f"Error loading roles: {e}")
+            return {}
+    
+    @staticmethod
+    async def _save_roles(roles_data: Dict[str, Any]) -> bool:
+        """Save all roles to the roles file."""
+        roles_file = Role._get_roles_file()
+        try:
+            # Ensure logs directory exists
+            await aiofiles.os.makedirs(roles_file.parent, exist_ok=True)
+            
+            async with aiofiles.open(roles_file, 'w', encoding='utf-8') as f:
+                await f.write(json.dumps(roles_data, indent=2, ensure_ascii=False))
+            return True
+        except Exception as e:
+            logger.error(f"Error saving roles: {e}")
+            return False
     
     @staticmethod
     def register(bot):
@@ -59,26 +99,26 @@ class Role(PluginInterface, PluginHelper):
     @staticmethod
     async def get_valid_options(member: disnake.Member) -> list:
         """Get valid role options for a member."""
-        # Get roles from storage
         try:
-            storage = member.guild._state._get_client().storage if hasattr(member.guild._state, '_get_client') else None
-            if not storage:
-                return []
-            
-            roles_data = await storage.get_all("roles")
+            roles_data = await Role._load_roles()
             valid_role_ids = []
             for key, value in roles_data.items():
                 if isinstance(value, dict) and value.get("guild_id") == str(member.guild.id):
                     valid_role_ids.append(int(key))
             
             return [role for role in member.guild.roles if role.id in valid_role_ids]
-        except:
+        except Exception as e:
+            logger.error(f"Error getting valid role options: {e}")
             return []
     
     @staticmethod
     async def role_entry(data):
         """Handle role command."""
         try:
+            if not data.guild:
+                await data.message.reply("This command can only be used in a server.")
+                return
+            
             p = Permission("p.roles.toggle", data.artemis, True)
             p.add_message_context(data.message)
             if not await p.resolve():
@@ -104,13 +144,26 @@ class Role(PluginInterface, PluginHelper):
     async def give_list(data):
         """Show list of available roles."""
         try:
+            if not data.guild:
+                await data.message.reply("This command can only be used in a server.")
+                return
+            
             p = Permission("p.roles.list", data.artemis, True)
             p.add_message_context(data.message)
             if not await p.resolve():
                 await p.send_unauthorized_message(data.message.channel)
                 return
             
-            valid_roles = await Role.get_valid_options(data.message.member)
+            # Get member from author - message.member might not always be available
+            member = data.guild.get_member(data.message.author.id)
+            if not member:
+                member = data.message.author if isinstance(data.message.author, disnake.Member) else None
+            
+            if not member:
+                await data.message.reply("Could not find member information.")
+                return
+            
+            valid_roles = await Role.get_valid_options(member)
             
             if not valid_roles:
                 await data.message.reply("No roles found! Tell the server owner to bug my owner!")
@@ -119,7 +172,7 @@ class Role(PluginInterface, PluginHelper):
             embed = Embed(
                 title=f"Roles List - {data.guild.name}",
                 description="Use `!role ROLE NAME` to toggle a role.\nDo **not** use an `@`!",
-                color=data.message.member.color
+                color=member.color if member.color.value else 0x00ff00
             )
             
             roles_text = "\n".join([f"{role.mention} (`!role {role.name}`)" for role in sorted(valid_roles, key=lambda r: r.position, reverse=True)])
@@ -143,7 +196,20 @@ class Role(PluginInterface, PluginHelper):
     async def toggle_role(data, role_name: str):
         """Toggle a role for a member."""
         try:
-            valid_roles = await Role.get_valid_options(data.message.member)
+            if not data.guild:
+                await data.message.reply("This command can only be used in a server.")
+                return
+            
+            # Get member from author - message.member might not always be available
+            member = data.guild.get_member(data.message.author.id)
+            if not member:
+                member = data.message.author if isinstance(data.message.author, disnake.Member) else None
+            
+            if not member:
+                await data.message.reply("Could not find member information.")
+                return
+            
+            valid_roles = await Role.get_valid_options(member)
             
             role = None
             for r in valid_roles:
@@ -168,11 +234,11 @@ class Role(PluginInterface, PluginHelper):
                 return
             
             # Toggle role
-            if role in data.message.member.roles:
-                await data.message.member.remove_roles(role, reason="Role toggle via bot")
+            if role in member.roles:
+                await member.remove_roles(role, reason="Role toggle via bot")
                 await data.message.reply(f"Role removed: {role.name}")
             else:
-                await data.message.member.add_roles(role, reason="Role toggle via bot")
+                await member.add_roles(role, reason="Role toggle via bot")
                 await data.message.reply(f"Role added: {role.name}")
         except Exception as e:
             await Role.exception_handler(data.message, e, True)
@@ -181,6 +247,10 @@ class Role(PluginInterface, PluginHelper):
     async def role_bind(data):
         """Bind a role to be self-assignable."""
         try:
+            if not data.guild:
+                await data.message.reply("This command can only be used in a server.")
+                return
+            
             p = Permission("p.roles.bind", data.artemis, False)
             p.add_message_context(data.message)
             if not await p.resolve():
@@ -189,35 +259,49 @@ class Role(PluginInterface, PluginHelper):
             
             args = Role.split_command(data.message.content)
             if len(args) < 2:
-                await Role.error(data.message, "Error", "Usage: `!bindrole ROLE_ID`.")
+                await data.message.reply("Usage: `!bindrole ROLE_ID` or `!bindrole @Role`")
                 return
             
-            role_id = int(args[1]) if args[1].isdigit() else None
+            role_id = None
+            # Try to parse as integer first
+            try:
+                role_id = int(args[1])
+            except ValueError:
+                pass
+            
+            # If not an integer, try to parse as role mention or name
             if not role_id:
                 role = Role.parse_role(data.guild, args[1])
                 if not role:
-                    await Role.error(data.message, "Error", "Usage: `!bindrole ROLE_ID`.")
+                    await data.message.reply("Role not found. Use a role ID, mention (@Role), or role name.")
                     return
                 role_id = role.id
             
             role = data.guild.get_role(role_id)
             if not role:
-                await Role.error(data.message, "Error", "Role not found.")
+                await data.message.reply("Role not found.")
                 return
             
             if role.id == data.guild.id:
-                await Role.error(data.message, "Error", "`@everyone` is not a bindable role!")
+                await data.message.reply("`@everyone` is not a bindable role!")
                 return
             
             # Store role
             try:
-                await data.artemis.storage.set("roles", str(role_id), {
+                roles_data = await Role._load_roles()
+                roles_data[str(role_id)] = {
                     "role_id": str(role_id),
                     "guild_id": str(data.guild.id)
-                })
-                await data.message.reply(f"Role added to server bindings: {role.name}")
+                }
+                if await Role._save_roles(roles_data):
+                    await data.message.reply(f"✅ Role `{role.name}` has been added to self-assignable roles!")
+                else:
+                    await data.message.reply("❌ Failed to save role binding. Please try again.")
             except Exception as e:
+                logger.error(f"Error storing role binding: {e}")
                 await Role.exception_handler(data.message, e, True)
+        except ValueError as e:
+            await data.message.reply("Invalid role ID. Please provide a valid role ID, mention, or name.")
         except Exception as e:
             await Role.exception_handler(data.message, e, True)
     

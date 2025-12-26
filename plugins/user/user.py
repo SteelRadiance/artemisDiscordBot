@@ -74,7 +74,7 @@ class User(PluginInterface, PluginHelper):
             if user_text:
                 member = await User.parse_guild_user(data.message.guild, user_text)
             else:
-                member = data.message.member
+                member = data.guild.get_member(data.message.author.id) if data.guild else None
             
             if not member:
                 await data.message.reply("Could not find that user.")
@@ -138,6 +138,22 @@ class User(PluginInterface, PluginHelper):
                 await data.message.reply("Unknown role. Type it out, @ it, or paste in the role ID.")
                 return
             
+            # Chunk the guild to ensure all members are loaded
+            # Check if we have significantly fewer members cached than the server reports
+            cached_count = len(data.guild.members)
+            server_count = data.guild.member_count or cached_count
+            
+            if cached_count < server_count * 0.9:  # If we're missing more than 10% of members
+                status_msg = await data.message.channel.send("Loading all members... This may take a moment.")
+                try:
+                    await data.guild.chunk()
+                    if status_msg:
+                        await status_msg.delete()
+                except Exception as e:
+                    logger.warning(f"Failed to chunk guild {data.guild.id}: {e}")
+                    if status_msg:
+                        await status_msg.edit(content=f"Warning: Could not load all members. Showing only {cached_count} cached members.")
+            
             # Get members with role, sorted by join date
             members_with_role = [
                 member for member in data.guild.members
@@ -170,7 +186,7 @@ class User(PluginInterface, PluginHelper):
         """Handle av command."""
         try:
             user_text = User.arg_substr(data.message.content, 1) or ""
-            member = await User.parse_guild_user(data.message.guild, user_text) if user_text else data.message.member
+            member = await User.parse_guild_user(data.message.guild, user_text) if user_text else (data.guild.get_member(data.message.author.id) if data.guild else None)
             
             if not member:
                 await data.message.reply("Could not find that user.")

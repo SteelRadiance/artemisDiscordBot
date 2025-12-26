@@ -109,7 +109,8 @@ class Localization(PluginInterface, PluginHelper):
                     f"*Note:* In most cases you should use the Continent/City values, as they will automatically compensate for Daylight Savings for your region."
                 )
             else:
-                tz_str = await Localization.fetch_timezone(data.message.member)
+                member = data.guild.get_member(data.message.author.id) if data.guild else None
+                tz_str = await Localization.fetch_timezone(member) if member else None
                 if not tz_str:
                     tz_str = "<unset (default UTC)>"
                     zone = pytz.UTC
@@ -137,7 +138,8 @@ class Localization(PluginInterface, PluginHelper):
                 await data.message.reply("Usage: `!time <time>`")
                 return
             
-            user_tz_str = await Localization.fetch_timezone(data.message.member)
+            member = data.guild.get_member(data.message.author.id) if data.guild else None
+            user_tz_str = await Localization.fetch_timezone(member) if member else None
             if not user_tz_str:
                 user_tz_str = "UTC"
             

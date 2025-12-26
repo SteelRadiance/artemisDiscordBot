@@ -160,8 +160,10 @@ class Ironreach(PluginInterface, PluginHelper):
             
             staff_channel = data.guild.get_channel(staff_channel_id)
             if staff_channel:
+                member = data.guild.get_member(data.message.author.id) if data.guild else None
+                member_mention = member.mention if member else data.message.author.mention
                 await staff_channel.send(
-                    f"<@&741883050278912050>: {data.message.member.mention} has asked for the talking stick!"
+                    f"<@&741883050278912050>: {member_mention} has asked for the talking stick!"
                 )
             
             await data.message.channel.send("Your request to get the Talking Stick has been relayed to staff.")

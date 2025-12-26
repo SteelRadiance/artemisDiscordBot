@@ -76,7 +76,8 @@ class Remind(PluginInterface, PluginHelper):
                 text = "*No reminder message left*"
             
             from plugins.localization.localization import Localization
-            user_tz_str = await Localization.fetch_timezone(data.message.member)
+            member = data.guild.get_member(data.message.author.id) if data.guild else None
+            user_tz_str = await Localization.fetch_timezone(member) if member else None
             if not user_tz_str:
                 user_tz_str = "UTC"
             
@@ -91,15 +92,19 @@ class Remind(PluginInterface, PluginHelper):
             
             await Remind.add_reminder(data, parsed_time, text, reminder_id)
             
+            display_name = member.display_name if member else data.message.author.display_name
+            avatar_url = member.display_avatar.url if member else data.message.author.display_avatar.url
+            member_color = member.color.value if member and member.color.value else 0x00ff00
+            
             embed = Embed(
                 title="Reminder added",
                 description=text,
                 timestamp=parsed_time,
-                color=data.message.member.color.value if data.message.member.color.value else 0x00ff00
+                color=member_color
             )
             embed.set_author(
-                name=data.message.member.display_name,
-                icon_url=data.message.member.display_avatar.url
+                name=display_name,
+                icon_url=avatar_url
             )
             embed.set_footer(text=f"Reminder {reminder_id}")
             

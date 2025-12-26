@@ -101,7 +101,8 @@ class MatchVoting(PluginInterface, PluginHelper):
     async def create_match(data, args: list):
         """Create a match."""
         try:
-            if not data.message.member.guild_permissions.manage_roles:
+            member = data.guild.get_member(data.message.author.id) if data.guild else None
+            if not member or not member.guild_permissions.manage_roles:
                 admin_ids = getattr(data.artemis.config, 'ADMIN_USER_IDS', [])
                 if str(data.message.author.id) not in admin_ids:
                     await MatchVoting.unauthorized(data.message)
@@ -143,7 +144,8 @@ class MatchVoting(PluginInterface, PluginHelper):
     async def add_competitor(data, args: list):
         """Add competitor to match."""
         try:
-            if not data.message.member.guild_permissions.manage_roles:
+            member = data.guild.get_member(data.message.author.id) if data.guild else None
+            if not member or not member.guild_permissions.manage_roles:
                 admin_ids = getattr(data.artemis.config, 'ADMIN_USER_IDS', [])
                 if str(data.message.author.id) not in admin_ids:
                     await MatchVoting.unauthorized(data.message)
@@ -214,7 +216,9 @@ class MatchVoting(PluginInterface, PluginHelper):
                 "created": datetime.now(pytz.UTC).isoformat()
             })
             
-            await data.message.reply(f"{data.message.member.display_name}, your vote for match ID `{match_id}` has been recorded!")
+            member = data.guild.get_member(data.message.author.id) if data.guild else None
+            display_name = member.display_name if member else data.message.author.display_name
+            await data.message.reply(f"{display_name}, your vote for match ID `{match_id}` has been recorded!")
             await data.message.delete()
         except Exception as e:
             await MatchVoting.exception_handler(data.message, e)

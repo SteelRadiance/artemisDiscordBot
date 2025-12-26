@@ -98,7 +98,10 @@ class GamesBot(PluginInterface, PluginHelper):
                 return
             
             game = " ".join(args).lower()
-            member = data.message.member
+            member = data.guild.get_member(data.message.author.id) if data.guild else None
+            if not member:
+                await data.message.reply("Could not find member information.")
+                return
             
             await GamesBot.add_game(data, member, game)
             await data.message.reply(f"`{member.display_name}` has been added to `{game}`")
@@ -126,7 +129,10 @@ class GamesBot(PluginInterface, PluginHelper):
                 return
             
             game = " ".join(args).lower()
-            member = data.message.member
+            member = data.guild.get_member(data.message.author.id) if data.guild else None
+            if not member:
+                await data.message.reply("Could not find member information.")
+                return
             
             await GamesBot.remove_game(data, member, game)
             await data.message.reply(f"`{member.display_name}` has been removed from `{game}`")
@@ -147,17 +153,21 @@ class GamesBot(PluginInterface, PluginHelper):
         try:
             games = await GamesBot.get_games(data.guild)
             
+            member = data.guild.get_member(data.message.author.id) if data.guild else None
+            member_color = member.color if member and member.color.value else 0x00ff00
+            
             embed = Embed(
                 title=f"Games - {data.guild.name}",
-                color=data.message.member.color
+                color=member_color
             )
             
             if games:
                 sorted_games = sorted(games.items(), key=lambda x: (-len(x[1]), x[0]))
                 
                 entries = []
+                author_id_str = str(data.message.author.id)
                 for game, member_ids in sorted_games:
-                    star = "⭐" if str(data.message.member.id) in member_ids else ""
+                    star = "⭐" if author_id_str in member_ids else ""
                     entries.append(f"{star} ({len(member_ids)}) {game}")
                 
                 entries_text = "\n".join(entries)
@@ -204,7 +214,9 @@ class GamesBot(PluginInterface, PluginHelper):
             members = [data.guild.get_member(int(mid)) for mid in member_ids if data.guild.get_member(int(mid))]
             member_mentions = ", ".join([m.mention for m in members])
             
-            await data.message.channel.send(f"`{data.message.member.display_name}` wants to play `{game}`\n{member_mentions}")
+            member = data.guild.get_member(data.message.author.id) if data.guild else None
+            display_name = member.display_name if member else data.message.author.display_name
+            await data.message.channel.send(f"`{display_name}` wants to play `{game}`\n{member_mentions}")
         except Exception as e:
             await GamesBot.exception_handler(data.message, e)
     

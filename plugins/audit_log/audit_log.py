@@ -78,13 +78,43 @@ class AuditLog(PluginInterface, PluginHelper):
     @staticmethod
     def _get_log_dir(bot) -> Path:
         """Get the log file directory path."""
-        storage_dir = Path(getattr(bot.storage, 'storage_dir', Path('storage')))
-        log_dir = storage_dir / "audit_log" / "logs"
+        log_dir = Path("logs") / "audit_logs"
         return log_dir
     
     @staticmethod
-    async def _get_current_log_file(bot, guild_id: int) -> Path:
-        """Get the current log file for a guild, creating it if needed."""
+    def _get_entry_timestamp(entry_data: Dict[str, Any]) -> Optional[datetime]:
+        """Extract timestamp from an entry data dict."""
+        if entry_data.get('created_at'):
+            try:
+                return datetime.fromisoformat(entry_data['created_at'])
+            except (ValueError, TypeError):
+                return None
+        return None
+    
+    @staticmethod
+    def _generate_log_filename(guild_id: int, start_time: Optional[datetime] = None, end_time: Optional[datetime] = None) -> str:
+        """Generate a log filename based on time range.
+        
+        Format: {guild_id}_{YYYYMMDD}_{HHMMSS}_to_{YYYYMMDD}_{HHMMSS}.json
+        If only start_time is provided: {guild_id}_{YYYYMMDD}_{HHMMSS}.json
+        """
+        if start_time is None:
+            start_time = datetime.now()
+        
+        start_str = start_time.strftime("%Y%m%d_%H%M%S")
+        
+        if end_time and end_time != start_time:
+            end_str = end_time.strftime("%Y%m%d_%H%M%S")
+            return f"{guild_id}_{start_str}_to_{end_str}.json"
+        else:
+            return f"{guild_id}_{start_str}.json"
+    
+    @staticmethod
+    async def _get_current_log_file(bot, guild_id: int, entry_timestamp: Optional[datetime] = None) -> Path:
+        """Get the current log file for a guild, creating it if needed.
+        
+        If entry_timestamp is provided, it will be used to name new files.
+        """
         log_dir = AuditLog._get_log_dir(bot)
         await aiofiles.os.makedirs(log_dir, exist_ok=True)
         
@@ -94,7 +124,10 @@ class AuditLog(PluginInterface, PluginHelper):
             log_files = []
             
             try:
-                async for entry in aiofiles.os.scandir(log_dir):
+                # Use os.scandir() wrapped in executor since aiofiles doesn't provide scandir
+                loop = asyncio.get_running_loop()
+                entries = await loop.run_in_executor(None, lambda d=log_dir: list(os.scandir(d)))
+                for entry in entries:
                     if entry.name.startswith(guild_prefix) and entry.name.endswith('.json'):
                         log_files.append(entry.path)
             except FileNotFoundError:
@@ -109,16 +142,23 @@ class AuditLog(PluginInterface, PluginHelper):
                 try:
                     size = await aiofiles.os.path.getsize(current_file)
                     if size >= AuditLog.MAX_LOG_FILE_SIZE:
-                        # Create a new file
-                        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-                        current_file = log_dir / f"{guild_id}_log_{timestamp}.json"
+                        # Create a new file based on entry timestamp or current time
+                        if entry_timestamp is None:
+                            entry_timestamp = datetime.now()
+                        filename = AuditLog._generate_log_filename(guild_id, entry_timestamp)
+                        current_file = log_dir / filename
                 except Exception:
-                    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-                    current_file = log_dir / f"{guild_id}_log_{timestamp}.json"
+                    # Create a new file if there was an error reading the existing one
+                    if entry_timestamp is None:
+                        entry_timestamp = datetime.now()
+                    filename = AuditLog._generate_log_filename(guild_id, entry_timestamp)
+                    current_file = log_dir / filename
             else:
-                # Create first log file
-                timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-                current_file = log_dir / f"{guild_id}_log_{timestamp}.json"
+                # Create first log file based on entry timestamp or current time
+                if entry_timestamp is None:
+                    entry_timestamp = datetime.now()
+                filename = AuditLog._generate_log_filename(guild_id, entry_timestamp)
+                current_file = log_dir / filename
             
             AuditLog._current_log_files[guild_id] = current_file
         
@@ -126,21 +166,29 @@ class AuditLog(PluginInterface, PluginHelper):
     
     @staticmethod
     async def _append_to_log_file(bot, guild_id: int, entry_data: Dict[str, Any]):
-        """Append an entry to the current log file, rotating if needed."""
+        """Append an entry to the current log file, rotating if needed.
+        
+        Files are named based on the time range of entries they contain.
+        """
         try:
-            log_file = await AuditLog._get_current_log_file(bot, guild_id)
+            # Get entry timestamp for naming
+            entry_timestamp = AuditLog._get_entry_timestamp(entry_data)
+            log_file = await AuditLog._get_current_log_file(bot, guild_id, entry_timestamp)
+            log_dir = AuditLog._get_log_dir(bot)
             
             # Check file size and rotate if needed
             try:
                 size = await aiofiles.os.path.getsize(log_file)
                 if size >= AuditLog.MAX_LOG_FILE_SIZE:
-                    # Rotate to new file
-                    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-                    log_dir = AuditLog._get_log_dir(bot)
-                    new_file = log_dir / f"{guild_id}_log_{timestamp}.json"
+                    # Rotate to new file named with the new entry's timestamp
+                    if entry_timestamp is None:
+                        entry_timestamp = datetime.now()
+                    filename = AuditLog._generate_log_filename(guild_id, entry_timestamp)
+                    new_file = log_dir / filename
                     AuditLog._current_log_files[guild_id] = new_file
                     log_file = new_file
             except FileNotFoundError:
+                # File doesn't exist yet, will be created below
                 pass
             
             # Read existing entries or create new list
@@ -160,6 +208,57 @@ class AuditLog(PluginInterface, PluginHelper):
             # Append new entry
             entries.append(entry_data)
             
+            # Calculate time range from all entries
+            timestamps = []
+            for entry in entries:
+                ts = AuditLog._get_entry_timestamp(entry)
+                if ts:
+                    timestamps.append(ts)
+            
+            if timestamps:
+                start_time = min(timestamps)
+                end_time = max(timestamps)
+                
+                # Generate filename based on time range
+                expected_filename = AuditLog._generate_log_filename(guild_id, start_time, end_time)
+                expected_file = log_dir / expected_filename
+                
+                # Rename file if needed to reflect the actual time range
+                if log_file != expected_file:
+                    try:
+                        # If target file exists (shouldn't happen, but be safe), append to it instead
+                        if await aiofiles.os.path.exists(expected_file):
+                            async with aiofiles.open(expected_file, 'r', encoding='utf-8') as f:
+                                content = await f.read()
+                                if content.strip():
+                                    existing_entries = json.loads(content)
+                                    if isinstance(existing_entries, list):
+                                        # Merge entries and update
+                                        all_entries = existing_entries + entries
+                                        # Re-sort by timestamp
+                                        all_entries.sort(key=lambda e: AuditLog._get_entry_timestamp(e) or datetime.min)
+                                        entries = all_entries
+                                        # Recalculate time range
+                                        timestamps = []
+                                        for entry in entries:
+                                            ts = AuditLog._get_entry_timestamp(entry)
+                                            if ts:
+                                                timestamps.append(ts)
+                                        if timestamps:
+                                            start_time = min(timestamps)
+                                            end_time = max(timestamps)
+                                            expected_filename = AuditLog._generate_log_filename(guild_id, start_time, end_time)
+                                            expected_file = log_dir / expected_filename
+                            # Remove old file if it exists and is different
+                            if log_file != expected_file and await aiofiles.os.path.exists(log_file):
+                                await aiofiles.os.remove(log_file)
+                        
+                        # Use the expected file path
+                        log_file = expected_file
+                        AuditLog._current_log_files[guild_id] = log_file
+                    except Exception as e:
+                        logger.warning(f"Error renaming log file to reflect time range: {e}")
+            
             # Write back to file
             async with aiofiles.open(log_file, 'w', encoding='utf-8') as f:
                 await f.write(json.dumps(entries, indent=2, ensure_ascii=False))
@@ -169,41 +268,58 @@ class AuditLog(PluginInterface, PluginHelper):
     
     @staticmethod
     async def load_from_storage(bot):
-        """Load existing audit log entries from JSON storage and log files."""
+        """Load existing audit log entries from log files."""
         try:
             await asyncio.sleep(2)
-            
-            # Load from JSON storage (legacy)
-            all_stored = await bot.storage.get_all("audit_log")
-            for key, entry_data in all_stored.items():
-                parts = key.split('_', 1)
-                if len(parts) == 2:
-                    try:
-                        guild_id = int(parts[0])
-                        entry_id = parts[1]
-                        
-                        if guild_id not in AuditLog._audit_log_storage:
-                            AuditLog._audit_log_storage[guild_id] = {}
-                        
-                        AuditLog._audit_log_storage[guild_id][entry_id] = entry_data
-                    except ValueError:
-                        continue
             
             # Load from log files
             log_dir = AuditLog._get_log_dir(bot)
             if await aiofiles.os.path.exists(log_dir):
                 guild_files: Dict[int, List[Path]] = defaultdict(list)
                 
-                async for entry in aiofiles.os.scandir(log_dir):
-                    if entry.name.endswith('.json'):
-                        try:
-                            # Parse filename: {guild_id}_log_{timestamp}.json
-                            parts = entry.name.replace('.json', '').split('_log_')
-                            if len(parts) == 2:
-                                guild_id = int(parts[0])
-                                guild_files[guild_id].append(Path(entry.path))
-                        except (ValueError, IndexError):
-                            continue
+                # Use os.scandir() wrapped in executor since aiofiles doesn't provide scandir
+                try:
+                    loop = asyncio.get_running_loop()
+                    entries = await loop.run_in_executor(None, lambda d=log_dir: list(os.scandir(d)))
+                    for entry in entries:
+                        if entry.name.endswith('.json'):
+                            try:
+                                name_no_ext = entry.name.replace('.json', '')
+                                # Extract guild_id from filename
+                                # New format: {guild_id}_{YYYYMMDD}_{HHMMSS}_to_{YYYYMMDD}_{HHMMSS}.json
+                                # or: {guild_id}_{YYYYMMDD}_{HHMMSS}.json
+                                # Old format: {guild_id}_log_{timestamp}.json
+                                
+                                if '_log_' in name_no_ext:
+                                    # Old format: {guild_id}_log_{timestamp}.json
+                                    parts = name_no_ext.split('_log_', 1)
+                                    if len(parts) == 2:
+                                        guild_id = int(parts[0])
+                                        guild_files[guild_id].append(Path(entry.path))
+                                elif '_to_' in name_no_ext:
+                                    # New format with range: {guild_id}_{YYYYMMDD}_{HHMMSS}_to_{YYYYMMDD}_{HHMMSS}.json
+                                    # Extract guild_id (everything before first date/time pattern)
+                                    parts = name_no_ext.split('_to_', 1)
+                                    if len(parts) == 2:
+                                        # First part is {guild_id}_{YYYYMMDD}_{HHMMSS}
+                                        # Split and take the first part as guild_id
+                                        start_part = parts[0]
+                                        # Split by underscore and take the first token as guild_id
+                                        guild_id_str = start_part.split('_')[0]
+                                        guild_id = int(guild_id_str)
+                                        guild_files[guild_id].append(Path(entry.path))
+                                else:
+                                    # New format without range: {guild_id}_{YYYYMMDD}_{HHMMSS}.json
+                                    # First part before first underscore is guild_id
+                                    parts = name_no_ext.split('_', 1)
+                                    if len(parts) >= 2:
+                                        # Should have at least {guild_id}_{YYYYMMDD}
+                                        guild_id = int(parts[0])
+                                        guild_files[guild_id].append(Path(entry.path))
+                            except (ValueError, IndexError):
+                                continue
+                except FileNotFoundError:
+                    pass
                 
                 # Load entries from all log files
                 for guild_id, files in guild_files.items():
@@ -266,12 +382,6 @@ class AuditLog(PluginInterface, PluginHelper):
             except Exception as e:
                 logger.warning(f"Failed to write audit log entry to file: {e}")
             
-            # Also write to legacy JSON storage for backward compatibility
-            try:
-                await bot.storage.set("audit_log", f"{guild_id}_{entry_id}", entry_data)
-            except Exception as e:
-                logger.warning(f"Failed to persist audit log entry to storage: {e}")
-            
             logger.debug(f"Stored new audit log entry {entry_id} for guild {entry.guild.name}")
         except Exception as e:
             logger.error(f"Error handling audit log entry: {e}", exc_info=True)
@@ -322,7 +432,10 @@ class AuditLog(PluginInterface, PluginHelper):
         
         guild_prefix = f"{guild_id}_"
         try:
-            async for entry in aiofiles.os.scandir(log_dir):
+            # Use os.scandir() wrapped in executor since aiofiles doesn't provide scandir
+            loop = asyncio.get_running_loop()
+            entries = await loop.run_in_executor(None, lambda d=log_dir: list(os.scandir(d)))
+            for entry in entries:
                 if entry.name.startswith(guild_prefix) and entry.name.endswith('.json'):
                     log_files.append(Path(entry.path))
         except FileNotFoundError:

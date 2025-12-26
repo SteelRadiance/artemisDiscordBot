@@ -4,7 +4,7 @@ Copyright 2025, Vijay Challa - Use of this source code follows the MIT license f
 Management Plugin - Bot management commands
 
 This plugin provides core bot administration commands including ping testing,
-bot information display, restart functionality, git updates, and invite link
+bot information display, and invite link
 generation. It shows system statistics, loaded plugins, dependencies, and
 bot status information.
 
@@ -12,8 +12,8 @@ Commands:
     !ping - Test bot latency
     !artemis - Display bot information and statistics
     !help - List all commands available to the user
-    !restart - Restart the bot (admin only)
-    !update - Pull latest code from git (admin only)
+    # !restart - Restart the bot (admin only) - DISABLED
+    # !update - Pull latest code from git (admin only) - DISABLED
     !invite - Generate bot invite URL
 
 Features:
@@ -21,7 +21,6 @@ Features:
     - Comprehensive bot info: memory, Python version, uptime, guild/channel counts
     - Plugin listing with emoji-based version hashes
     - Dependency version display
-    - Git integration for updates
     - OAuth invite URL generation with proper permissions
 """
 
@@ -29,6 +28,7 @@ import time
 import os
 import sys
 import subprocess
+import asyncio
 import importlib.metadata
 from datetime import datetime, timedelta
 import logging
@@ -73,19 +73,19 @@ class Management(PluginInterface, PluginHelper):
             .set_help("**Usage**: `!artemis`\n\nDisplays bot information including memory usage, Python version, uptime, guild/channel counts, loaded plugins, and dependencies.")
         )
         
-        bot.eventManager.add_listener(
-            EventListener.new()
-            .add_command("restart")
-            .set_callback(Management.restart)
-            .set_help("**Usage**: `!restart`\n\nRestarts the bot. (Admin only)")
-        )
+        # bot.eventManager.add_listener(
+        #     EventListener.new()
+        #     .add_command("restart")
+        #     .set_callback(Management.restart)
+        #     .set_help("**Usage**: `!restart`\n\nRestarts the bot. (Admin only)")
+        # )
         
-        bot.eventManager.add_listener(
-            EventListener.new()
-            .add_command("update")
-            .set_callback(Management.update)
-            .set_help("**Usage**: `!update`\n\nPulls the latest code from git. (Admin only)")
-        )
+        # bot.eventManager.add_listener(
+        #     EventListener.new()
+        #     .add_command("update")
+        #     .set_callback(Management.update)
+        #     .set_help("**Usage**: `!update`\n\nPulls the latest code from git. (Admin only)")
+        # )
         
         bot.eventManager.add_listener(
             EventListener.new()
@@ -209,73 +209,84 @@ class Management(PluginInterface, PluginHelper):
         except Exception as e:
             await Management.exception_handler(data.message, e, True)
     
-    @staticmethod
-    async def restart(data):
-        """Handle restart command."""
-        admin_ids = getattr(data.artemis.config, 'ADMIN_USER_IDS', [])
-        if str(data.message.author.id) not in admin_ids:
-            await Management.unauthorized(data.message)
-            return
-        
-        await data.message.channel.send("🃏🔫")
-        
-        # Get the path to main.py (project root)
-        project_root = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
-        main_script = os.path.join(project_root, "main.py")
-        
-        # Get Python executable
-        python_exe = sys.executable
-        
-        try:
-            # Set environment variable to indicate this is a restart
-            env = os.environ.copy()
-            env['ARTEMIS_RESTART'] = '1'
-            
-            # Spawn a new process to restart the bot
-            if os.name == 'nt':  # Windows
-                # On Windows, use CREATE_NEW_CONSOLE to spawn in a new console window
-                subprocess.Popen(
-                    [python_exe, main_script],
-                    cwd=project_root,
-                    env=env,
-                    creationflags=subprocess.CREATE_NEW_CONSOLE,
-                    stdout=subprocess.DEVNULL,
-                    stderr=subprocess.DEVNULL
-                )
-            else:  # Unix-like systems
-                # On Unix, detach the process so it continues after parent exits
-                subprocess.Popen(
-                    [python_exe, main_script],
-                    cwd=project_root,
-                    env=env,
-                    start_new_session=True,
-                    stdout=subprocess.DEVNULL,
-                    stderr=subprocess.DEVNULL
-                )
-        except Exception as e:
-            logger.error(f"Failed to restart bot: {e}")
-            await data.message.channel.send(f"❌ Failed to restart: {str(e)}")
-            return
-        
-        # Give the new process a moment to start
-        time.sleep(0.5)
-        
-        # Exit the current process
-        sys.exit(0)
+    # @staticmethod
+    # async def restart(data):
+    #     """Handle restart command."""
+    #     admin_ids = getattr(data.artemis.config, 'ADMIN_USER_IDS', [])
+    #     if str(data.message.author.id) not in admin_ids:
+    #         await Management.unauthorized(data.message)
+    #         return
+    #     
+    #     await data.message.channel.send("🃏🔫")
+    #     
+    #     # Get the path to main.py (project root)
+    #     project_root = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
+    #     main_script = os.path.join(project_root, "main.py")
+    #     
+    #     # Get Python executable
+    #     python_exe = sys.executable
+    #     
+    #     try:
+    #         # Set environment variable to indicate this is a restart
+    #         env = os.environ.copy()
+    #         env['ARTEMIS_RESTART'] = '1'
+    #         
+    #         # Spawn a new process to restart the bot
+    #         if os.name == 'nt':  # Windows
+    #             # On Windows, use CREATE_NEW_CONSOLE to spawn in a new console window
+    #             subprocess.Popen(
+    #                 [python_exe, main_script],
+    #                 cwd=project_root,
+    #                 env=env,
+    #                 creationflags=subprocess.CREATE_NEW_CONSOLE,
+    #                 stdout=subprocess.DEVNULL,
+    #                 stderr=subprocess.DEVNULL
+    #             )
+    #         else:  # Unix-like systems
+    #             # On Unix, detach the process so it continues after parent exits
+    #             subprocess.Popen(
+    #                 [python_exe, main_script],
+    #                 cwd=project_root,
+    #                 env=env,
+    #                 start_new_session=True,
+    #                 stdout=subprocess.DEVNULL,
+    #                 stderr=subprocess.DEVNULL
+    #             )
+    #     except Exception as e:
+    #         logger.error(f"Failed to restart bot: {e}")
+    #         await data.message.channel.send(f"❌ Failed to restart: {str(e)}")
+    #         return
+    #     
+    #     # Give the new process a moment to start
+    #     await asyncio.sleep(0.5)
+    #     
+    #     # Properly close the bot connection before exiting
+    #     # Create a task to close and exit, so we don't block the current handler
+    #     async def shutdown_and_exit():
+    #         try:
+    #             await data.artemis.close()
+    #         except Exception as e:
+    #             logger.error(f"Error during bot shutdown: {e}")
+    #         finally:
+    #             # Use os._exit instead of sys.exit to avoid the task exception issue
+    #             os._exit(0)
+    #     
+    #     # Schedule the shutdown task
+    #     asyncio.create_task(shutdown_and_exit())
     
-    @staticmethod
-    async def update(data):
-        """Handle update command."""
-        admin_ids = getattr(data.artemis.config, 'ADMIN_USER_IDS', [])
-        if str(data.message.author.id) not in admin_ids:
-            await Management.unauthorized(data.message)
-            return
-        
-        try:
-            result = Management.git_pull()
-            await data.message.channel.send(f"```\n{result}\n```")
-        except Exception as e:
-            await Management.exception_handler(data.message, e, True)
+    # @staticmethod
+    # async def update(data):
+    #     """Handle update command."""
+    #     admin_ids = getattr(data.artemis.config, 'ADMIN_USER_IDS', [])
+    #     if str(data.message.author.id) not in admin_ids:
+    #         await Management.unauthorized(data.message)
+    #         return
+    #     
+    #     try:
+    #         result = Management.git_pull()
+    #         await data.message.channel.send(f"```\n{result}\n```")
+    #     except Exception as e:
+    #         await Management.exception_handler(data.message, e, True)
     
     @staticmethod
     async def invite(data):
@@ -306,8 +317,8 @@ class Management(PluginInterface, PluginHelper):
                 "artemis": (None, True, "Display bot information and statistics", "Management"),
                 "help": (None, True, "List all available commands", "Management"),
                 "invite": (None, False, "Generate bot invite URL (admin only)", "Management"),
-                "restart": (None, False, "Restart the bot (admin only)", "Management"),
-                "update": (None, False, "Pull latest code from git (admin only)", "Management"),
+                # "restart": (None, False, "Restart the bot (admin only)", "Management"),
+                # "update": (None, False, "Pull latest code from git (admin only)", "Management"),
                 
                 "user": (None, True, "Get user information", "User"),
                 "roster": ("p.userutils.roster", True, "List members with a role", "User"),
@@ -421,28 +432,28 @@ class Management(PluginInterface, PluginHelper):
         except Exception as e:
             await Management.exception_handler(data.message, e, True)
     
-    @staticmethod
-    def git_pull() -> str:
-        """Execute git pull and return output."""
-        try:
-            if os.name == 'nt':  # Windows
-                result = subprocess.run(
-                    ['git', 'pull'],
-                    capture_output=True,
-                    text=True,
-                    cwd=os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
-                )
-            else:  # Unix-like
-                result = subprocess.run(
-                    ['./update'],
-                    capture_output=True,
-                    text=True,
-                    cwd=os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
-                )
-            
-            return result.stdout + result.stderr
-        except Exception as e:
-            return f"Error: {str(e)}"
+    # @staticmethod
+    # def git_pull() -> str:
+    #     """Execute git pull and return output."""
+    #     try:
+    #         if os.name == 'nt':  # Windows
+    #             result = subprocess.run(
+    #                 ['git', 'pull'],
+    #                 capture_output=True,
+    #                 text=True,
+    #                 cwd=os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
+    #             )
+    #         else:  # Unix-like
+    #             result = subprocess.run(
+    #                 ['./update'],
+    #                 capture_output=True,
+    #                 text=True,
+    #                 cwd=os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
+    #             )
+    #         
+    #         return result.stdout + result.stderr
+    #     except Exception as e:
+    #         return f"Error: {str(e)}"
     
     @staticmethod
     def git_version() -> str:
