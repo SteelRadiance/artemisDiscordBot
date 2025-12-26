@@ -71,9 +71,9 @@ class Observer(PluginInterface, PluginHelper):
         async def on_invite_create(invite):
             await Observer.invite_handler(invite)
         
-        # @bot.event
-        # async def on_raw_reaction_add(payload: disnake.RawReactionActionEvent):
-        #     await Observer.report_handler_raw(bot, payload)
+        @bot.event
+        async def on_raw_reaction_add(payload: disnake.RawReactionActionEvent):
+            pass
     
     @staticmethod
     async def get_info(guild: disnake.Guild) -> dict:
@@ -277,65 +277,7 @@ class Observer(PluginInterface, PluginHelper):
         except Exception as e:
             logger.warning(f"Error in invite_handler: {e}")
     
-    # @staticmethod
-    # async def report_handler_raw(bot, payload: disnake.RawReactionActionEvent):
-    #     """Handle report reaction from raw event."""
-    #     try:
-    #         if payload.user_id == bot.user.id:
-    #             return
-    #         
-    #         user_obj = bot.get_user(payload.user_id)
-    #         if user_obj and user_obj.bot:
-    #             return
-    #         
-    #         if not payload.guild_id:
-    #             return
-    #         
-    #         guild = bot.get_guild(payload.guild_id)
-    #         if not guild:
-    #             return
-    #         
-    #         info = await Observer.get_info(guild)
-    #         if not info or not info.get("channel_id") or not info.get("report_emote"):
-    #             return
-    #         
-    #         channel = bot.get_channel(payload.channel_id)
-    #         if not channel:
-    #             return
-    #         
-    #         try:
-    #             message = await channel.fetch_message(payload.message_id)
-    #         except:
-    #             return
-    #         
-    #         user = payload.member
-    #         if not user:
-    #             user = await bot.fetch_user(payload.user_id)
-    #         
-    #         if not user or message.author.id == user.id:
-    #             return
-    #         
-    #         emote_id = str(payload.emoji.id) if payload.emoji.id else str(payload.emoji)
-    #         configured_emote = str(info["report_emote"])
-    #         
-    #         if emote_id != configured_emote:
-    #             return
-    #         
-    #         log_channel = guild.get_channel(int(info["channel_id"]))
-    #         if not log_channel:
-    #             return
-    #         
-    #         embed = Observer.embed_message(message, 0xcc0000)
-    #         member = guild.get_member(user.id)
-    #         
-    #         await log_channel.send(
-    #             f"**⚠ Reported message** - reported by {member.display_name if member else user.name} in {channel.mention} - {message.jump_url}",
-    #             embed=embed
-    #         )
-    #         
-    #         try:
-    #             await message.remove_reaction(payload.emoji, user)
-    #         except:
-    #             pass
-    #     except Exception as e:
-    #         logger.error(f"Error in report_handler_raw: {e}", exc_info=True)
+    @staticmethod
+    async def report_handler_raw(bot, payload: disnake.RawReactionActionEvent):
+        """Handle report reaction from raw event."""
+        pass
