@@ -41,6 +41,7 @@ config/config.py
 temp/
 *.log
 logs/*
+storage/
 
 # OS
 .DS_Store
