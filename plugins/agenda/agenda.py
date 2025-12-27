@@ -57,18 +57,6 @@ class Agenda(PluginInterface, PluginHelper):
             .set_callback(Agenda.agenda_tally_handler)
             .set_help("**Usage**: `!agenda <message_url_or_id>`\n\nTally votes from a message with reactions. Counts votes from staff members based on configured vote types (For, Against, Abstain, Absent) and provides a detailed breakdown including quorum status.")
         )
-        
-        # Register event listener for configuration
-        bot.eventManager.add_listener(
-            EventListener.new()
-            .add_event("agendaPluginConf")
-            .set_callback(Agenda.handle_config_event)
-        )
-    
-    @staticmethod
-    async def handle_config_event(bot, configs: dict):
-        """Handle agenda configuration event."""
-        pass
     
     @staticmethod
     async def agenda_tally_handler(data):
@@ -101,7 +89,8 @@ class Agenda(PluginInterface, PluginHelper):
             vote_counts = {vote_type: [] for vote_type in vote_types.keys()}
             
             for reaction in import_msg.reactions:
-                emoji_id = reaction.emoji.id if reaction.emoji.id else str(reaction.emoji)
+                # Handle both custom emojis (with id) and Unicode emojis (strings)
+                emoji_id = reaction.emoji.id if hasattr(reaction.emoji, 'id') else str(reaction.emoji)
                 users = [user async for user in reaction.users()]
                 
                 vote_type = None

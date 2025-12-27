@@ -11,6 +11,7 @@ bot status information.
 Commands:
     !ping - Test bot latency
     !artemis - Display bot information and statistics
+    !artemis <channel_id> - Set channel for periodic bot info messages (admin only)
     !help - List all commands available to the user
     # !restart - Restart the bot (admin only) - DISABLED
     # !update - Pull latest code from git (admin only) - DISABLED
@@ -21,10 +22,11 @@ Commands:
 
 Features:
     - Ping measurement using Discord snowflake timestamps
-    - Comprehensive bot info: memory, Python version, uptime, guild/channel counts
+    - Comprehensive bot info: memory, Python version, uptime, guild/channel counts, process ID
     - Plugin listing with emoji-based version hashes
     - Dependency version display
     - OAuth invite URL generation with proper permissions
+    - Periodic bot info: Automatically sends bot information every 24 hours to configured channels
     - Talking stick: Relays requests to staff using observer channel and configurable staff role
     - Voice channel naming: Automatically renames empty voice channels with names from data files
 """
@@ -78,7 +80,7 @@ class Management(PluginInterface, PluginHelper):
             EventListener.new()
             .add_command("artemis")
             .set_callback(Management.info)
-            .set_help("**Usage**: `!artemis`\n\nDisplays bot information including memory usage, Python version, uptime, guild/channel counts, loaded plugins, and dependencies.")
+            .set_help("**Usage**: `!artemis [channel_id]`\n\nDisplays bot information including memory usage, Python version, uptime, guild/channel counts, loaded plugins, and dependencies. Admin can use `!artemis <channel_id>` to set the channel for periodic bot info messages.")
         )
         
         # bot.eventManager.add_listener(
@@ -131,6 +133,12 @@ class Management(PluginInterface, PluginHelper):
         
         bot.eventManager.add_listener(
             EventListener.new()
+            .set_periodic(24 * 60 * 60)  # 24 hours
+            .set_callback(Management.periodic_info)
+        )
+        
+        bot.eventManager.add_listener(
+            EventListener.new()
             .add_event("ready")
             .set_callback(lambda bot: setattr(Management, 'startup_time', time.time()))
         )
@@ -159,87 +167,184 @@ class Management(PluginInterface, PluginHelper):
             await Management.exception_handler(data.message, e)
     
     @staticmethod
-    async def info(data):
-        """Handle info command."""
-        try:
-            args = Management.split_command(data.message.content)
-            show_dependencies = "-dependencies" in args
-            
-            embed = Embed(title="Artemis Bot Information")
-            
-            import psutil
-            process = psutil.Process(os.getpid())
-            memory_mb = process.memory_info().rss / 1024 / 1024
-            embed.add_field(name="Memory usage", value=f"{memory_mb:.2f} MiB", inline=True)
-            
-            embed.add_field(name="Python", value=sys.version.split()[0], inline=True)
-            
-            embed.add_field(name="PID / User", value=f"{os.getpid()} / {os.getenv('USER', 'unknown')}", inline=True)
-            
-            guild_count = len(data.artemis.guilds)
-            channel_count = sum(len(guild.channels) for guild in data.artemis.guilds)
-            user_count = len(data.artemis.users)
+    def create_info_embed(bot, show_dependencies=False):
+        """Create the bot information embed."""
+        embed = Embed(title="Artemis Bot Information")
+        
+        import psutil
+        process = psutil.Process(os.getpid())
+        memory_mb = process.memory_info().rss / 1024 / 1024
+        embed.add_field(name="Memory usage", value=f"{memory_mb:.2f} MiB", inline=True)
+        
+        embed.add_field(name="Python", value=sys.version.split()[0], inline=True)
+        
+        embed.add_field(name="PID / User", value=f"{os.getpid()} / {os.getenv('USER', 'unknown')}", inline=True)
+        
+        guild_count = len(bot.guilds)
+        channel_count = sum(len(guild.channels) for guild in bot.guilds)
+        user_count = len(bot.users)
+        embed.add_field(
+            name="Guilds / Channels / (loaded) Users",
+            value=f"{guild_count} / {channel_count} / {user_count}",
+            inline=False
+        )
+        
+        version = Management.git_version()
+        version_hash = emoji_hash(f"artemis-{__version__}-{version}")
+        embed.add_field(name="Artemis", value=f"{version} {version_hash}", inline=False)
+        
+        import platform
+        embed.add_field(name="System", value=platform.platform(), inline=False)
+        
+        if Management.startup_time:
+            uptime_seconds = time.time() - Management.startup_time
+            uptime_delta = timedelta(seconds=int(uptime_seconds))
+            uptime_str = str(uptime_delta)
+            connected_time = datetime.fromtimestamp(Management.startup_time).isoformat()
             embed.add_field(
-                name="Guilds / Channels / (loaded) Users",
-                value=f"{guild_count} / {channel_count} / {user_count}",
+                name="Uptime",
+                value=f"{uptime_str} - *(connected {connected_time})*",
                 inline=False
             )
+        
+        plugins = Management.get_plugins(bot)
+        if plugins:
+            plugins_with_hashes = []
+            for plugin_name in plugins:
+                plugin_hash = emoji_hash(f"plugin-{plugin_name}")
+                plugins_with_hashes.append(f"{plugin_name} {plugin_hash}")
             
-            version = Management.git_version()
-            version_hash = emoji_hash(f"artemis-{__version__}-{version}")
-            embed.add_field(name="Artemis", value=f"{version} {version_hash}", inline=False)
-            
-            import platform
-            embed.add_field(name="System", value=platform.platform(), inline=False)
-            
-            if Management.startup_time:
-                uptime_seconds = time.time() - Management.startup_time
-                uptime_delta = timedelta(seconds=int(uptime_seconds))
-                uptime_str = str(uptime_delta)
-                connected_time = datetime.fromtimestamp(Management.startup_time).isoformat()
-                embed.add_field(
-                    name="Uptime",
-                    value=f"{uptime_str} - *(connected {connected_time})*",
-                    inline=False
-                )
-            
-            plugins = Management.get_plugins(data.artemis)
-            if plugins:
-                plugins_with_hashes = []
-                for plugin_name in plugins:
-                    plugin_hash = emoji_hash(f"plugin-{plugin_name}")
-                    plugins_with_hashes.append(f"{plugin_name} {plugin_hash}")
-                
-                plugins_text = "\n".join(plugins_with_hashes)
-                if len(plugins_text) > 1024:
-                    chunks = [plugins_text[i:i+1024] for i in range(0, len(plugins_text), 1024)]
+            plugins_text = "\n".join(plugins_with_hashes)
+            if len(plugins_text) > 1024:
+                chunks = [plugins_text[i:i+1024] for i in range(0, len(plugins_text), 1024)]
+                for i, chunk in enumerate(chunks):
+                    embed.add_field(
+                        name="Loaded Plugins" if i == 0 else "Loaded Plugins (cont.)",
+                        value=chunk,
+                        inline=False
+                    )
+            else:
+                embed.add_field(name="Loaded Plugins", value=plugins_text, inline=False)
+        
+        if show_dependencies:
+            deps = Management.get_dependencies()
+            if deps:
+                deps_text = "\n".join([f"{name} ({version})" for name, version in deps.items()])
+                if len(deps_text) > 1024:
+                    chunks = [deps_text[i:i+1024] for i in range(0, len(deps_text), 1024)]
                     for i, chunk in enumerate(chunks):
                         embed.add_field(
-                            name="Loaded Plugins" if i == 0 else "Loaded Plugins (cont.)",
+                            name="Dependencies" if i == 0 else "Dependencies (cont.)",
                             value=chunk,
                             inline=False
                         )
                 else:
-                    embed.add_field(name="Loaded Plugins", value=plugins_text, inline=False)
+                    embed.add_field(name="Dependencies", value=deps_text, inline=False)
+        
+        return embed
+    
+    @staticmethod
+    async def get_bot_info_channel(guild: disnake.Guild) -> Optional[disnake.TextChannel]:
+        """Get the configured bot info channel for the guild."""
+        try:
+            storage = guild._state._get_client().storage if hasattr(guild._state, '_get_client') else None
+            if not storage:
+                return None
             
-            if show_dependencies:
-                deps = Management.get_dependencies()
-                if deps:
-                    deps_text = "\n".join([f"{name} ({version})" for name, version in deps.items()])
-                    if len(deps_text) > 1024:
-                        chunks = [deps_text[i:i+1024] for i in range(0, len(deps_text), 1024)]
-                        for i, chunk in enumerate(chunks):
-                            embed.add_field(
-                                name="Dependencies" if i == 0 else "Dependencies (cont.)",
-                                value=chunk,
-                                inline=False
-                            )
+            info = await storage.get("botinfo", str(guild.id))
+            if info and isinstance(info, dict) and info.get("channel_id"):
+                channel = guild.get_channel(int(info["channel_id"]))
+                return channel
+            return None
+        except:
+            return None
+    
+    @staticmethod
+    async def set_bot_info_channel(guild: disnake.Guild, channel: disnake.TextChannel):
+        """Set the bot info channel for the guild."""
+        try:
+            storage = guild._state._get_client().storage if hasattr(guild._state, '_get_client') else None
+            if not storage:
+                return False
+            
+            await storage.set("botinfo", str(guild.id), {
+                "guild_id": str(guild.id),
+                "channel_id": str(channel.id)
+            })
+            return True
+        except Exception as e:
+            logger.error(f"Failed to set bot info channel: {e}")
+            return False
+    
+    @staticmethod
+    async def info(data):
+        """Handle info command."""
+        try:
+            if not data.guild:
+                # DM context - just show info
+                args = Management.split_command(data.message.content)
+                show_dependencies = "-dependencies" in args
+                embed = Management.create_info_embed(data.artemis, show_dependencies)
+                await data.message.channel.send(embed=embed)
+                return
+            
+            args = Management.split_command(data.message.content)
+            show_dependencies = "-dependencies" in args
+            
+            # Check if this is a configuration command (channel ID provided)
+            # Only process if there's a second argument that looks like a channel ID (numeric)
+            if len(args) > 1:
+                try:
+                    channel_id = int(args[1])
+                    # This looks like a channel ID, so require admin access
+                    admin_ids = getattr(data.artemis.config, 'ADMIN_USER_IDS', [])
+                    if str(data.message.author.id) not in admin_ids:
+                        await Management.unauthorized(data.message)
+                        return
+                    
+                    channel = data.guild.get_channel(channel_id)
+                    if not channel:
+                        await data.message.channel.send("Channel not found.")
+                        return
+                    
+                    if not isinstance(channel, disnake.TextChannel):
+                        await data.message.channel.send("Channel must be a text channel.")
+                        return
+                    
+                    if await Management.set_bot_info_channel(data.guild, channel):
+                        await data.message.channel.send(f"{channel.mention} set as bot info channel for periodic messages.")
                     else:
-                        embed.add_field(name="Dependencies", value=deps_text, inline=False)
+                        await data.message.channel.send("Failed to set bot info channel.")
+                    return
+                except ValueError:
+                    # Not a valid channel ID (e.g., "-dependencies" flag), treat as regular command
+                    pass
             
+            embed = Management.create_info_embed(data.artemis, show_dependencies)
             await data.message.channel.send(embed=embed)
         except Exception as e:
             await Management.exception_handler(data.message, e, True)
+    
+    @staticmethod
+    async def periodic_info(bot):
+        """Periodically send bot information (runs every 24 hours)."""
+        try:
+            embed = Management.create_info_embed(bot, show_dependencies=False)
+            
+            # Send to configured channels for each guild
+            for guild in bot.guilds:
+                channel = await Management.get_bot_info_channel(guild)
+                if not channel:
+                    # Skip if no channel configured for this guild
+                    continue
+                
+                try:
+                    await channel.send(embed=embed)
+                    logger.info(f"Sent periodic bot info to {guild.name} ({guild.id}) in {channel.name}")
+                except Exception as e:
+                    logger.warning(f"Failed to send periodic info to {guild.name} in {channel.name}: {e}")
+        except Exception as e:
+            logger.error(f"Error in periodic_info: {e}", exc_info=True)
     
     # @staticmethod
     # async def restart(data):
