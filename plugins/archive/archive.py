@@ -142,7 +142,7 @@ class Archive(PluginInterface, PluginHelper):
                     payload["users"][str(message.author.id)] = {
                         "id": message.author.id,
                         "tag": str(message.author),
-                        "nick": message.author.display_name if hasattr(message.author, 'display_name') else message.author.name,
+                        "nick": getattr(message.author, 'display_name', message.author.name),
                         "av": message.author.display_avatar.url if message.author.display_avatar else None,
                         "webhook": bool(message.webhook_id)
                     }
@@ -151,7 +151,6 @@ class Archive(PluginInterface, PluginHelper):
                 
                 payload["messages"].append(msg_data)
             
-            # Save to file
             json_data = json.dumps(payload, indent=2, ensure_ascii=False)
             fname = f"{channel.id}_{channel.name}.json"
             
@@ -167,7 +166,6 @@ class Archive(PluginInterface, PluginHelper):
                 with open(file_path, 'w', encoding='utf-8') as f:
                     f.write(json_data)
             
-            # Send file
             try:
                 file_obj = disnake.File(str(file_path), filename=fname if not file_path.suffix == '.gz' else f"{fname}.gz")
                 await data.message.channel.send(f"Done! {len(messages)} messages saved.", file=file_obj)

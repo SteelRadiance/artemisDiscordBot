@@ -63,13 +63,13 @@ class Localization(PluginInterface, PluginHelper):
         try:
             storage = member.guild._state._get_client().storage if hasattr(member.guild._state, '_get_client') else None
             if storage:
-                tz = await storage.get("locale", str(member.id), {})
+                tz = await storage.get("locale", str(member.id))
                 if isinstance(tz, dict):
                     return tz.get("timezone")
                 elif isinstance(tz, str):
                     return tz
             return None
-        except:
+        except Exception:
             return None
     
     @staticmethod

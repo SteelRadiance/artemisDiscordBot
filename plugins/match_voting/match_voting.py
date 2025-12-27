@@ -118,7 +118,7 @@ class MatchVoting(PluginInterface, PluginHelper):
             try:
                 parsed_time = MatchVoting.read_time(period)
                 deadline = datetime.now(pytz.UTC) + (parsed_time - datetime.now(pytz.UTC))
-            except:
+            except Exception:
                 deadline = datetime.now(pytz.UTC)
                 import dateutil.relativedelta as rd
                 deadline += rd.relativedelta(hours=24)

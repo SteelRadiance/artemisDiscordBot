@@ -211,7 +211,11 @@ class GamesBot(PluginInterface, PluginHelper):
                 return
             
             member_ids = games[game]
-            members = [data.guild.get_member(int(mid)) for mid in member_ids if data.guild.get_member(int(mid))]
+            members = []
+            for mid in member_ids:
+                member = data.guild.get_member(int(mid))
+                if member:
+                    members.append(member)
             member_mentions = ", ".join([m.mention for m in members])
             
             member = data.guild.get_member(data.message.author.id) if data.guild else None

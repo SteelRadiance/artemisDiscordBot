@@ -256,7 +256,7 @@ class Management(PluginInterface, PluginHelper):
                 channel = guild.get_channel(int(info["channel_id"]))
                 return channel
             return None
-        except:
+        except Exception:
             return None
     
     @staticmethod
@@ -335,7 +335,6 @@ class Management(PluginInterface, PluginHelper):
             for guild in bot.guilds:
                 channel = await Management.get_bot_info_channel(guild)
                 if not channel:
-                    # Skip if no channel configured for this guild
                     continue
                 
                 try:
@@ -345,85 +344,6 @@ class Management(PluginInterface, PluginHelper):
                     logger.warning(f"Failed to send periodic info to {guild.name} in {channel.name}: {e}")
         except Exception as e:
             logger.error(f"Error in periodic_info: {e}", exc_info=True)
-    
-    # @staticmethod
-    # async def restart(data):
-    #     """Handle restart command."""
-    #     admin_ids = getattr(data.artemis.config, 'ADMIN_USER_IDS', [])
-    #     if str(data.message.author.id) not in admin_ids:
-    #         await Management.unauthorized(data.message)
-    #         return
-    #     
-    #     await data.message.channel.send("🃏🔫")
-    #     
-    #     # Get the path to main.py (project root)
-    #     project_root = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
-    #     main_script = os.path.join(project_root, "main.py")
-    #     
-    #     # Get Python executable
-    #     python_exe = sys.executable
-    #     
-    #     try:
-    #         # Set environment variable to indicate this is a restart
-    #         env = os.environ.copy()
-    #         env['ARTEMIS_RESTART'] = '1'
-    #         
-    #         # Spawn a new process to restart the bot
-    #         if os.name == 'nt':  # Windows
-    #             # On Windows, use CREATE_NEW_CONSOLE to spawn in a new console window
-    #             subprocess.Popen(
-    #                 [python_exe, main_script],
-    #                 cwd=project_root,
-    #                 env=env,
-    #                 creationflags=subprocess.CREATE_NEW_CONSOLE,
-    #                 stdout=subprocess.DEVNULL,
-    #                 stderr=subprocess.DEVNULL
-    #             )
-    #         else:  # Unix-like systems
-    #             # On Unix, detach the process so it continues after parent exits
-    #             subprocess.Popen(
-    #                 [python_exe, main_script],
-    #                 cwd=project_root,
-    #                 env=env,
-    #                 start_new_session=True,
-    #                 stdout=subprocess.DEVNULL,
-    #                 stderr=subprocess.DEVNULL
-    #             )
-    #     except Exception as e:
-    #         logger.error(f"Failed to restart bot: {e}")
-    #         await data.message.channel.send(f"❌ Failed to restart: {str(e)}")
-    #         return
-    #     
-    #     # Give the new process a moment to start
-    #     await asyncio.sleep(0.5)
-    #     
-    #     # Properly close the bot connection before exiting
-    #     # Create a task to close and exit, so we don't block the current handler
-    #     async def shutdown_and_exit():
-    #         try:
-    #             await data.artemis.close()
-    #         except Exception as e:
-    #             logger.error(f"Error during bot shutdown: {e}")
-    #         finally:
-    #             # Use os._exit instead of sys.exit to avoid the task exception issue
-    #             os._exit(0)
-    #     
-    #     # Schedule the shutdown task
-    #     asyncio.create_task(shutdown_and_exit())
-    
-    # @staticmethod
-    # async def update(data):
-    #     """Handle update command."""
-    #     admin_ids = getattr(data.artemis.config, 'ADMIN_USER_IDS', [])
-    #     if str(data.message.author.id) not in admin_ids:
-    #         await Management.unauthorized(data.message)
-    #         return
-    #     
-    #     try:
-    #         result = Management.git_pull()
-    #         await data.message.channel.send(f"```\n{result}\n```")
-    #     except Exception as e:
-    #         await Management.exception_handler(data.message, e, True)
     
     @staticmethod
     async def invite(data):
@@ -454,8 +374,6 @@ class Management(PluginInterface, PluginHelper):
                 "artemis": (None, True, "Display bot information and statistics", "Management"),
                 "help": (None, True, "List all available commands", "Management"),
                 "invite": (None, False, "Generate bot invite URL (admin only)", "Management"),
-                # "restart": (None, False, "Restart the bot (admin only)", "Management"),
-                # "update": (None, False, "Pull latest code from git (admin only)", "Management"),
                 
                 "user": (None, True, "Get user information", "User"),
                 "roster": ("p.userutils.roster", True, "List members with a role", "User"),
@@ -569,33 +487,10 @@ class Management(PluginInterface, PluginHelper):
                 dm_channel = await data.message.author.create_dm()
                 await dm_channel.send(embed=embed)
                 await data.message.reply("📬 I've sent the command list to your DMs!")
-            except:
+            except Exception:
                 await data.message.reply(embed=embed)
         except Exception as e:
             await Management.exception_handler(data.message, e, True)
-    
-    # @staticmethod
-    # def git_pull() -> str:
-    #     """Execute git pull and return output."""
-    #     try:
-    #         if os.name == 'nt':  # Windows
-    #             result = subprocess.run(
-    #                 ['git', 'pull'],
-    #                 capture_output=True,
-    #                 text=True,
-    #                 cwd=os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
-    #             )
-    #         else:  # Unix-like
-    #             result = subprocess.run(
-    #                 ['./update'],
-    #                 capture_output=True,
-    #                 text=True,
-    #                 cwd=os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
-    #             )
-    #         
-    #         return result.stdout + result.stderr
-    #     except Exception as e:
-    #         return f"Error: {str(e)}"
     
     @staticmethod
     def git_version() -> str:
@@ -626,7 +521,7 @@ class Management(PluginInterface, PluginHelper):
                 repo = 'SteelRadiance/artemisDiscordBot'
             
             return f"[{commit[:7]}](https://github.com/{repo}/commit/{commit})"
-        except:
+        except Exception:
             return "unknown"
     
     @staticmethod
@@ -646,7 +541,7 @@ class Management(PluginInterface, PluginHelper):
             for dist in dists:
                 deps[dist.metadata['Name']] = dist.version
             return deps
-        except:
+        except Exception:
             return {}
     
     @staticmethod
@@ -661,7 +556,7 @@ class Management(PluginInterface, PluginHelper):
             if info and isinstance(info, dict) and info.get("staff_role_id"):
                 return int(info["staff_role_id"])
             return None
-        except:
+        except Exception:
             return None
     
     @staticmethod
@@ -717,7 +612,6 @@ class Management(PluginInterface, PluginHelper):
                     await data.message.reply("Usage: `!talkingstick role <role_id>` or `!talkingstick role @Role`")
                     return
                 
-                # Parse role
                 role_id = None
                 try:
                     role_id = int(args[2])
@@ -729,26 +623,22 @@ class Management(PluginInterface, PluginHelper):
                         return
                     role_id = role.id
                 
-                # Verify role exists
                 role = data.guild.get_role(role_id)
                 if not role:
                     await data.message.reply("Role not found.")
                     return
                 
-                # Save the role
                 if await Management.set_staff_role(data.guild, role_id):
                     await data.message.reply(f"✅ Staff role set to {role.mention} for talking stick notifications.")
                 else:
                     await data.message.reply("❌ Failed to save staff role configuration.")
                 return
             
-            # Get observer channel (same channel observer uses)
             observer_channel = await Management.get_observer_channel(data.guild)
             if not observer_channel:
                 await data.message.reply("⚠️ Talking stick is not configured. An admin needs to set up the observer channel first using `!observer <channel_id>`.")
                 return
             
-            # Get staff role
             staff_role_id = await Management.get_staff_role_id(data.guild)
             if not staff_role_id:
                 await data.message.reply("⚠️ No staff role configured. An admin needs to set one using `!talkingstick role <role_id>`.")
@@ -759,7 +649,6 @@ class Management(PluginInterface, PluginHelper):
                 await data.message.reply("⚠️ Configured staff role no longer exists. An admin needs to reconfigure it.")
                 return
             
-            # Send notification to observer channel
             member = data.guild.get_member(data.message.author.id) if data.guild else None
             member_mention = member.mention if member else data.message.author.mention
             
@@ -770,7 +659,7 @@ class Management(PluginInterface, PluginHelper):
             try:
                 dm_channel = await data.message.author.create_dm()
                 await dm_channel.send("Your request to get the Talking Stick has been relayed to staff.")
-            except:
+            except Exception:
                 await data.message.channel.send("Your request to get the Talking Stick has been relayed to staff.")
             
             await data.message.delete()
@@ -796,13 +685,10 @@ class Management(PluginInterface, PluginHelper):
     async def voice_chat_change(bot):
         """Change voice channel names."""
         try:
-            # This is a generic implementation - can be customized per guild if needed
             for guild in bot.guilds:
-                # Skip if no voice channels
                 if not guild.voice_channels:
                     continue
                 
-                # Find empty voice channels (can be customized per guild)
                 empty_channels = [
                     ch for ch in guild.voice_channels
                     if len(ch.members) == 0
@@ -811,7 +697,6 @@ class Management(PluginInterface, PluginHelper):
                 if not empty_channels:
                     continue
                 
-                # Try to load track names from data file (guild-specific or generic)
                 tracks = []
                 tracks_file = Path(f"data/{guild.id}.txt")
                 if not tracks_file.exists():
@@ -823,11 +708,10 @@ class Management(PluginInterface, PluginHelper):
                     if tracks_file.exists():
                         with open(tracks_file, 'r', encoding='utf-8') as f:
                             tracks = [line.strip() for line in f if line.strip()]
-                except:
+                except Exception:
                     pass
                 
                 if not tracks:
-                    # Skip if no track names available
                     continue
                 
                 selected_tracks = random.sample(tracks, min(len(empty_channels), len(tracks)))

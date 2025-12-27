@@ -233,7 +233,6 @@ class Role(PluginInterface, PluginHelper):
                     await data.message.reply("No roles found! Tell the server owner to bug my owner!")
                 return
             
-            # Toggle role
             if role in member.roles:
                 await member.remove_roles(role, reason="Role toggle via bot")
                 await data.message.reply(f"Role removed: {role.name}")
@@ -286,7 +285,6 @@ class Role(PluginInterface, PluginHelper):
                 await data.message.reply("`@everyone` is not a bindable role!")
                 return
             
-            # Store role
             try:
                 roles_data = await Role._load_roles()
                 roles_data[str(role_id)] = {

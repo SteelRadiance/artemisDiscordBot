@@ -89,7 +89,6 @@ class Agenda(PluginInterface, PluginHelper):
             vote_counts = {vote_type: [] for vote_type in vote_types.keys()}
             
             for reaction in import_msg.reactions:
-                # Handle both custom emojis (with id) and Unicode emojis (strings)
                 emoji_id = reaction.emoji.id if hasattr(reaction.emoji, 'id') else str(reaction.emoji)
                 users = [user async for user in reaction.users()]
                 

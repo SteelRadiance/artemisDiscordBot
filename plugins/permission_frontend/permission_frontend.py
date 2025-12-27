@@ -163,14 +163,11 @@ class PermissionFrontend(PluginInterface, PluginHelper):
                 await data.message.reply("Cannot determine user information.")
                 return
             
-            # Check if user is bot admin
             admin_ids = getattr(data.artemis.config, 'ADMIN_USER_IDS', [])
             is_admin = str(data.message.author.id) in admin_ids
             
-            # Get all permissions from storage
             all_perms = await data.artemis.storage.get_all("permissions")
             
-            # Filter permissions that apply to this user
             user_perms = {}
             
             for perm_key, perm_data in all_perms.items():
@@ -184,7 +181,6 @@ class PermissionFrontend(PluginInterface, PluginHelper):
                 target_type = perm_data.get("target_type")
                 target_value = perm_data.get("target_value")
                 
-                # Check if scope applies
                 scope_applies = False
                 if setting == PermissionFrontend.SETTING_GLOBAL:
                     scope_applies = True
@@ -196,7 +192,6 @@ class PermissionFrontend(PluginInterface, PluginHelper):
                 if not scope_applies:
                     continue
                 
-                # Check if target applies
                 target_applies = False
                 if target_type == PermissionFrontend.TARGET_GLOBAL:
                     target_applies = True
@@ -212,15 +207,11 @@ class PermissionFrontend(PluginInterface, PluginHelper):
                     target_applies = is_admin
                 
                 if target_applies:
-                    # Store permission with its allow/deny status
-                    # If permission already exists, prioritize deny over allow (deny takes precedence)
                     if permission not in user_perms:
                         user_perms[permission] = allow
                     elif not allow:
-                        # Deny takes precedence over allow
                         user_perms[permission] = False
             
-            # If user is bot admin, they have all permissions
             if is_admin:
                 embed = Embed(
                     title="Your Permissions",
@@ -243,10 +234,8 @@ class PermissionFrontend(PluginInterface, PluginHelper):
                 )
                 
                 if allowed_perms:
-                    # Split into chunks if too long
                     allowed_text = "\n".join(f"✅ `{perm}`" for perm in sorted(allowed_perms))
                     if len(allowed_text) > 1024:
-                        # Split into multiple fields if needed
                         chunk_size = 1000
                         chunks = [allowed_text[i:i+chunk_size] for i in range(0, len(allowed_text), chunk_size)]
                         for i, chunk in enumerate(chunks[:5]):  # Limit to 5 fields
@@ -295,7 +284,6 @@ class PermissionFrontend(PluginInterface, PluginHelper):
     async def listall_perm(data):
         """List all permissions stored in the system."""
         try:
-            # Get all permissions from storage
             all_perms = await data.artemis.storage.get_all("permissions")
             
             if not all_perms:
@@ -307,7 +295,6 @@ class PermissionFrontend(PluginInterface, PluginHelper):
                 await data.message.reply(embed=embed)
                 return
             
-            # Group permissions by permission name
             perm_groups = {}
             
             for perm_key, perm_data in all_perms.items():
@@ -324,7 +311,6 @@ class PermissionFrontend(PluginInterface, PluginHelper):
                 if permission not in perm_groups:
                     perm_groups[permission] = []
                 
-                # Format scope
                 scope_str = ""
                 if setting == PermissionFrontend.SETTING_GLOBAL:
                     scope_str = "🌐 Global"
@@ -343,7 +329,6 @@ class PermissionFrontend(PluginInterface, PluginHelper):
                     else:
                         scope_str = f"📺 Channel: {setting_value}"
                 
-                # Format target
                 target_str = ""
                 if target_type == PermissionFrontend.TARGET_GLOBAL:
                     target_str = "👥 All users"
@@ -376,21 +361,17 @@ class PermissionFrontend(PluginInterface, PluginHelper):
                     "target": target_str
                 })
             
-            # Create embed with all permissions
             embed = Embed(
                 title="All Configured Permissions",
                 description=f"Total: {len(perm_groups)} unique permission(s), {len(all_perms)} rule(s)",
                 color=0x0099ff
             )
             
-            # Sort permissions alphabetically
             sorted_perms = sorted(perm_groups.items())
             
-            # Limit to 25 permissions to stay within Discord embed limits
             max_perms = 25
             display_perms = sorted_perms[:max_perms]
             
-            # Build permission list
             for permission, rules in display_perms:
                 rules_text = []
                 for rule in rules:
@@ -399,7 +380,6 @@ class PermissionFrontend(PluginInterface, PluginHelper):
                 
                 perm_text = "\n".join(rules_text)
                 
-                # Truncate if too long
                 if len(perm_text) > 1024:
                     perm_text = perm_text[:1020] + "..."
                 
@@ -409,7 +389,6 @@ class PermissionFrontend(PluginInterface, PluginHelper):
                     inline=False
                 )
             
-            # Add footer if there are more permissions
             if len(sorted_perms) > max_perms:
                 embed.set_footer(text=f"Showing first {max_perms} of {len(sorted_perms)} permissions")
             

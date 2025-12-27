@@ -85,7 +85,7 @@ class Observer(PluginInterface, PluginHelper):
             
             info = await storage.get("observer", str(guild.id))
             return info if isinstance(info, dict) else None
-        except:
+        except Exception:
             return None
     
     @staticmethod

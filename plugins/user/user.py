@@ -154,7 +154,6 @@ class User(PluginInterface, PluginHelper):
                     if status_msg:
                         await status_msg.edit(content=f"Warning: Could not load all members. Showing only {cached_count} cached members.")
             
-            # Get members with role, sorted by join date
             members_with_role = [
                 member for member in data.guild.members
                 if role in member.roles

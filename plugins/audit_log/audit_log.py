@@ -134,27 +134,22 @@ class AuditLog(PluginInterface, PluginHelper):
                 pass
             
             if log_files:
-                # Sort by modification time, most recent first
                 log_files.sort(key=lambda p: os.path.getmtime(p), reverse=True)
                 current_file = Path(log_files[0])
                 
-                # Check if current file is too large
                 try:
                     size = await aiofiles.os.path.getsize(current_file)
                     if size >= AuditLog.MAX_LOG_FILE_SIZE:
-                        # Create a new file based on entry timestamp or current time
                         if entry_timestamp is None:
                             entry_timestamp = datetime.now()
-                        filename = AuditLog._generate_log_filename(guild_id, entry_timestamp)
-                        current_file = log_dir / filename
+                    filename = AuditLog._generate_log_filename(guild_id, entry_timestamp)
+                    current_file = log_dir / filename
                 except Exception:
-                    # Create a new file if there was an error reading the existing one
                     if entry_timestamp is None:
                         entry_timestamp = datetime.now()
                     filename = AuditLog._generate_log_filename(guild_id, entry_timestamp)
                     current_file = log_dir / filename
             else:
-                # Create first log file based on entry timestamp or current time
                 if entry_timestamp is None:
                     entry_timestamp = datetime.now()
                 filename = AuditLog._generate_log_filename(guild_id, entry_timestamp)
@@ -171,16 +166,13 @@ class AuditLog(PluginInterface, PluginHelper):
         Files are named based on the time range of entries they contain.
         """
         try:
-            # Get entry timestamp for naming
             entry_timestamp = AuditLog._get_entry_timestamp(entry_data)
             log_file = await AuditLog._get_current_log_file(bot, guild_id, entry_timestamp)
             log_dir = AuditLog._get_log_dir(bot)
             
-            # Check file size and rotate if needed
             try:
                 size = await aiofiles.os.path.getsize(log_file)
                 if size >= AuditLog.MAX_LOG_FILE_SIZE:
-                    # Rotate to new file named with the new entry's timestamp
                     if entry_timestamp is None:
                         entry_timestamp = datetime.now()
                     filename = AuditLog._generate_log_filename(guild_id, entry_timestamp)
@@ -188,10 +180,8 @@ class AuditLog(PluginInterface, PluginHelper):
                     AuditLog._current_log_files[guild_id] = new_file
                     log_file = new_file
             except FileNotFoundError:
-                # File doesn't exist yet, will be created below
                 pass
             
-            # Read existing entries or create new list
             entries = []
             if await aiofiles.os.path.exists(log_file):
                 try:
@@ -205,10 +195,8 @@ class AuditLog(PluginInterface, PluginHelper):
                     logger.warning(f"Error reading log file {log_file}: {e}, creating new file")
                     entries = []
             
-            # Append new entry
             entries.append(entry_data)
             
-            # Calculate time range from all entries
             timestamps = []
             for entry in entries:
                 ts = AuditLog._get_entry_timestamp(entry)
@@ -219,11 +207,9 @@ class AuditLog(PluginInterface, PluginHelper):
                 start_time = min(timestamps)
                 end_time = max(timestamps)
                 
-                # Generate filename based on time range
                 expected_filename = AuditLog._generate_log_filename(guild_id, start_time, end_time)
                 expected_file = log_dir / expected_filename
                 
-                # Rename file if needed to reflect the actual time range
                 if log_file != expected_file:
                     try:
                         # If target file exists (shouldn't happen, but be safe), append to it instead
@@ -233,12 +219,9 @@ class AuditLog(PluginInterface, PluginHelper):
                                 if content.strip():
                                     existing_entries = json.loads(content)
                                     if isinstance(existing_entries, list):
-                                        # Merge entries and update
                                         all_entries = existing_entries + entries
-                                        # Re-sort by timestamp
                                         all_entries.sort(key=lambda e: AuditLog._get_entry_timestamp(e) or datetime.min)
                                         entries = all_entries
-                                        # Recalculate time range
                                         timestamps = []
                                         for entry in entries:
                                             ts = AuditLog._get_entry_timestamp(entry)
@@ -249,17 +232,14 @@ class AuditLog(PluginInterface, PluginHelper):
                                             end_time = max(timestamps)
                                             expected_filename = AuditLog._generate_log_filename(guild_id, start_time, end_time)
                                             expected_file = log_dir / expected_filename
-                            # Remove old file if it exists and is different
                             if log_file != expected_file and await aiofiles.os.path.exists(log_file):
                                 await aiofiles.os.remove(log_file)
                         
-                        # Use the expected file path
                         log_file = expected_file
                         AuditLog._current_log_files[guild_id] = log_file
                     except Exception as e:
                         logger.warning(f"Error renaming log file to reflect time range: {e}")
             
-            # Write back to file
             async with aiofiles.open(log_file, 'w', encoding='utf-8') as f:
                 await f.write(json.dumps(entries, indent=2, ensure_ascii=False))
         
@@ -272,7 +252,6 @@ class AuditLog(PluginInterface, PluginHelper):
         try:
             await asyncio.sleep(2)
             
-            # Load from log files
             log_dir = AuditLog._get_log_dir(bot)
             if await aiofiles.os.path.exists(log_dir):
                 guild_files: Dict[int, List[Path]] = defaultdict(list)
@@ -285,35 +264,22 @@ class AuditLog(PluginInterface, PluginHelper):
                         if entry.name.endswith('.json'):
                             try:
                                 name_no_ext = entry.name.replace('.json', '')
-                                # Extract guild_id from filename
-                                # New format: {guild_id}_{YYYYMMDD}_{HHMMSS}_to_{YYYYMMDD}_{HHMMSS}.json
-                                # or: {guild_id}_{YYYYMMDD}_{HHMMSS}.json
-                                # Old format: {guild_id}_log_{timestamp}.json
                                 
                                 if '_log_' in name_no_ext:
-                                    # Old format: {guild_id}_log_{timestamp}.json
                                     parts = name_no_ext.split('_log_', 1)
                                     if len(parts) == 2:
                                         guild_id = int(parts[0])
                                         guild_files[guild_id].append(Path(entry.path))
                                 elif '_to_' in name_no_ext:
-                                    # New format with range: {guild_id}_{YYYYMMDD}_{HHMMSS}_to_{YYYYMMDD}_{HHMMSS}.json
-                                    # Extract guild_id (everything before first date/time pattern)
                                     parts = name_no_ext.split('_to_', 1)
                                     if len(parts) == 2:
-                                        # First part is {guild_id}_{YYYYMMDD}_{HHMMSS}
-                                        # Split and take the first part as guild_id
                                         start_part = parts[0]
-                                        # Split by underscore and take the first token as guild_id
                                         guild_id_str = start_part.split('_')[0]
                                         guild_id = int(guild_id_str)
                                         guild_files[guild_id].append(Path(entry.path))
                                 else:
-                                    # New format without range: {guild_id}_{YYYYMMDD}_{HHMMSS}.json
-                                    # First part before first underscore is guild_id
                                     parts = name_no_ext.split('_', 1)
                                     if len(parts) >= 2:
-                                        # Should have at least {guild_id}_{YYYYMMDD}
                                         guild_id = int(parts[0])
                                         guild_files[guild_id].append(Path(entry.path))
                             except (ValueError, IndexError):
@@ -321,9 +287,7 @@ class AuditLog(PluginInterface, PluginHelper):
                 except FileNotFoundError:
                     pass
                 
-                # Load entries from all log files
                 for guild_id, files in guild_files.items():
-                    # Sort by modification time, most recent first
                     files.sort(key=lambda p: os.path.getmtime(p), reverse=True)
                     
                     for log_file in files:
@@ -367,8 +331,8 @@ class AuditLog(PluginInterface, PluginHelper):
                 'guild_id': str(guild_id),
                 'user_id': str(entry.user.id) if entry.user else None,
                 'target_id': str(entry.target.id) if entry.target else None,
-                'action': entry.action.name if hasattr(entry.action, 'name') else str(entry.action),
-                'action_type': entry.action.value if hasattr(entry.action, 'value') else None,
+                'action': entry.action.name,
+                'action_type': entry.action.value,
                 'reason': entry.reason,
                 'changes': AuditLog._extract_changes(entry),
                 'created_at': entry.created_at.isoformat() if entry.created_at else None,
@@ -376,7 +340,6 @@ class AuditLog(PluginInterface, PluginHelper):
             
             AuditLog._audit_log_storage[guild_id][entry_id] = entry_data
             
-            # Write to log file
             try:
                 await AuditLog._append_to_log_file(bot, guild_id, entry_data)
             except Exception as e:
@@ -441,7 +404,6 @@ class AuditLog(PluginInterface, PluginHelper):
         except FileNotFoundError:
             return log_files
         
-        # Sort by modification time, most recent first
         log_files.sort(key=lambda p: os.path.getmtime(p), reverse=True)
         return log_files
     
@@ -459,7 +421,6 @@ class AuditLog(PluginInterface, PluginHelper):
             guild_id = data.guild.id
             bot = data.artemis
             
-            # Get all log files for this guild
             log_files = await AuditLog._get_all_log_files(bot, guild_id)
             
             if not log_files:
@@ -470,7 +431,6 @@ class AuditLog(PluginInterface, PluginHelper):
                 dm_channel = await data.message.author.create_dm()
                 
                 if readable:
-                    # Send readable format from all log files
                     for i, log_file in enumerate(log_files):
                         try:
                             async with aiofiles.open(log_file, 'r', encoding='utf-8') as f:
@@ -478,12 +438,10 @@ class AuditLog(PluginInterface, PluginHelper):
                                 if content.strip():
                                     entries = json.loads(content)
                                     if isinstance(entries, list) and entries:
-                                        # Format as readable
                                         lines = []
                                         file_name = log_file.name
                                         lines.append(f"**Log File: {file_name}**\n")
                                         
-                                        # Sort entries by timestamp (most recent first)
                                         def get_timestamp(entry):
                                             if entry.get('created_at'):
                                                 try:
@@ -506,7 +464,6 @@ class AuditLog(PluginInterface, PluginHelper):
                                             entry_id = entry.get('id', 'Unknown')
                                             action = entry.get('action', 'Unknown')
                                             
-                                            # Resolve user ID to username
                                             user_str = "Unknown"
                                             if entry.get('user_id'):
                                                 try:
@@ -523,7 +480,6 @@ class AuditLog(PluginInterface, PluginHelper):
                                                 except (ValueError, TypeError):
                                                     user_str = f"User ID: {entry['user_id']}"
                                             
-                                            # Resolve target ID
                                             target_str = "None"
                                             if entry.get('target_id'):
                                                 try:
@@ -557,7 +513,6 @@ class AuditLog(PluginInterface, PluginHelper):
                                         output_text = "\n".join(lines)
                                         
                                         if len(output_text) > 2000:
-                                            # Split into chunks
                                             chunks = []
                                             current_chunk = []
                                             current_length = 0
@@ -589,7 +544,6 @@ class AuditLog(PluginInterface, PluginHelper):
                     
                     await data.message.channel.send(f"{data.message.author.mention}, I've sent the readable audit log to your DMs!")
                 else:
-                    # Send JSON files
                     for i, log_file in enumerate(log_files):
                         try:
                             file_obj = disnake.File(

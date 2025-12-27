@@ -77,8 +77,7 @@ class Remind(PluginInterface, PluginHelper):
             
             from plugins.localization.localization import Localization
             member = data.guild.get_member(data.message.author.id) if data.guild else None
-            storage = data.artemis.storage
-            user_tz_str = await Localization.fetch_timezone(member, storage) if member else None
+            user_tz_str = await Localization.fetch_timezone(member) if member else None
             if not user_tz_str:
                 user_tz_str = "UTC"
             
@@ -227,7 +226,7 @@ class Remind(PluginInterface, PluginHelper):
                     timestamp = orig_msg.created_at
                 else:
                     timestamp = datetime.now(pytz.UTC)
-            except:
+            except Exception:
                 timestamp = datetime.now(pytz.UTC)
             
             embed = Embed(
