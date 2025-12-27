@@ -72,6 +72,8 @@ class GamesBot(PluginInterface, PluginHelper):
                 await GamesBot.list_game_handler(data, args[2:] if len(args) > 2 else [])
             elif command == "ping":
                 await GamesBot.ping_game_handler(data, args[2:] if len(args) > 2 else [])
+            elif len(args) > 2 and args[-1].lower() == "show":
+                await GamesBot.show_game_handler(data, args[1:-1])
             else:
                 await data.message.reply(GamesBot.get_help())
         except Exception as e:
@@ -86,7 +88,8 @@ class GamesBot(PluginInterface, PluginHelper):
             "- `add`: add yourself to a game\n"
             "- `remove`: remove yourself from a game\n"
             "- `list`: show current game tags in use\n"
-            "- `ping`: ping a particular game"
+            "- `ping`: ping a particular game\n"
+            "- `<game> show`: list everyone who plays that game (without pinging)"
         )
     
     @staticmethod
@@ -221,6 +224,44 @@ class GamesBot(PluginInterface, PluginHelper):
             member = data.guild.get_member(data.message.author.id) if data.guild else None
             display_name = member.display_name if member else data.message.author.display_name
             await data.message.channel.send(f"`{display_name}` wants to play `{game}`\n{member_mentions}")
+        except Exception as e:
+            await GamesBot.exception_handler(data.message, e)
+    
+    @staticmethod
+    async def show_game_handler(data, args: list):
+        """Show game tag players without pinging."""
+        try:
+            if not args:
+                await data.message.reply("Usage: `!gamesbot <game> show`")
+                return
+            
+            game = " ".join(args).lower()
+            games = await GamesBot.get_games(data.guild)
+            
+            if game not in games:
+                await data.message.reply(f"No members with `{game}` are present on this server")
+                return
+            
+            member_ids = games[game]
+            members = []
+            for mid in member_ids:
+                member = data.guild.get_member(int(mid))
+                if member:
+                    members.append(member)
+            
+            if not members:
+                await data.message.reply(f"No members with `{game}` are currently in this server")
+                return
+            
+            member_names = ", ".join([m.display_name for m in members])
+            
+            embed = Embed(
+                title=f"Players of {game}",
+                description=f"**{len(members)} player(s):**\n{member_names}",
+                color=0x00ff00
+            )
+            
+            await data.message.reply(embed=embed)
         except Exception as e:
             await GamesBot.exception_handler(data.message, e)
     
