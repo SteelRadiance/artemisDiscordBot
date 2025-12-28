@@ -6,6 +6,7 @@ on:
 jobs:
   deploy:
     runs-on: ubuntu-latest
+    if: github.actor == 'SteelRadiance'
     steps:
       - name: SSH and Deploy
         uses: appleboy/ssh-action@master
