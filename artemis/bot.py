@@ -41,10 +41,12 @@ class ArtemisBot(commands.Bot):
         """
         self.config = config
         
-        intents = disnake.Intents.default()
-        intents.message_content = True
-        intents.members = True  # Required to track member joins/leaves/updates
-        intents.guilds = True  # Required to track guild events
+        intents = disnake.Intents.all()
+        # intents.message_content = True
+        # intents.messages = True
+        # intents.members = True  # Required to track member joins/leaves/updates
+        # intents.guilds = True  # Required to track guild events
+        # intents.expressions = True  # Required to track reaction events
         super().__init__(
             command_prefix=config.COMMAND_PREFIX,
             intents=intents,

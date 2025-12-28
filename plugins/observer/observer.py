@@ -72,20 +72,27 @@ class Observer(PluginInterface, PluginHelper):
             await Observer.invite_handler(invite)
         
         @bot.event
-        async def on_raw_reaction_add(payload: disnake.RawReactionActionEvent):
-            pass
+        async def on_raw_reaction_add(payload):
+            await Observer.report_handler(bot, payload)
     
     @staticmethod
-    async def get_info(guild: disnake.Guild) -> dict:
+    async def get_info(guild: disnake.Guild, bot=None) -> dict:
         """Get observer configuration for guild."""
         try:
-            storage = guild._state._get_client().storage if hasattr(guild._state, '_get_client') else None
+            # Try to get storage from bot if provided
+            if bot and hasattr(bot, 'storage'):
+                storage = bot.storage
+            else:
+                # Fall back to getting storage from guild state
+                storage = guild._state._get_client().storage if hasattr(guild._state, '_get_client') else None
+            
             if not storage:
                 return None
             
             info = await storage.get("observer", str(guild.id))
             return info if isinstance(info, dict) else None
-        except Exception:
+        except Exception as e:
+            logger.warning(f"Failed to get observer info for guild {guild.id}: {e}")
             return None
     
     @staticmethod
@@ -278,6 +285,79 @@ class Observer(PluginInterface, PluginHelper):
             logger.warning(f"Error in invite_handler: {e}")
     
     @staticmethod
-    async def report_handler_raw(bot, payload: disnake.RawReactionActionEvent):
-        """Handle report reaction from raw event."""
-        pass
+    async def report_handler(bot, payload: disnake.RawReactionActionEvent):
+        """Handle report reaction."""
+        if payload.event_type != "REACTION_ADD":
+            return
+            
+        if payload.user_id == bot.user.id:
+            return
+        
+        # Get guild from bot
+        guild = bot.get_guild(payload.guild_id)
+        if not guild:
+            return
+        
+        info = await Observer.get_info(guild, bot)
+        if not info or not info.get("channel_id"):
+            logger.debug(f"No observer channel configured for guild {guild.id}")
+            return
+        
+        # Get the observer channel
+        channel = guild.get_channel(int(info["channel_id"]))
+        if not channel:
+            logger.warning(f"Observer channel {info['channel_id']} not found in guild {guild.id}")
+            return
+        
+        if not info.get("report_emote"):
+            embed = Embed(
+                title="Warning: No report emote set",
+                color=0xbf2222,
+                timestamp=datetime.now()
+            )
+            await channel.send(embed=embed)
+            return
+
+        # Compare emoji IDs (handle both custom and unicode emojis)
+        emoji_id = str(payload.emoji.id) if payload.emoji.id else str(payload.emoji)
+        report_emote_id = str(info["report_emote"])
+        
+        if emoji_id != report_emote_id:
+            return
+        
+        # Fetch the message that was reacted to
+        message_channel = guild.get_channel(payload.channel_id)
+        if not message_channel:
+            return
+        
+        try:
+            message = await message_channel.fetch_message(payload.message_id)
+        except Exception as e:
+            logger.warning(f"Failed to fetch message {payload.message_id}: {e}")
+            return
+        
+        # Remove the reaction
+        try:
+            await message.remove_reaction(payload.emoji, payload.member or await guild.fetch_member(payload.user_id))
+        except Exception as e:
+            logger.warning(f"Failed to remove reaction: {e}")
+
+        # Get reporter
+        reporter = payload.member or await guild.fetch_member(payload.user_id)
+        if not reporter:
+            reporter = await bot.fetch_user(payload.user_id)
+        
+        # Create report embed
+        embed = Embed(
+            title="Message Reported",
+            color=0xbf2222,
+            timestamp=datetime.now()
+        )
+        embed.set_author(name=f"{reporter.name}#{getattr(reporter, 'discriminator', '')}", icon_url=reporter.display_avatar.url)
+        embed.add_field(name="Reported by", value=f"{reporter.mention} ({reporter.name})", inline=True)
+        embed.add_field(name="Reported User", value=f"{message.author.mention} ({message.author.name})", inline=True)
+        embed.add_field(name="Channel", value=message_channel.mention, inline=True)
+        embed.add_field(name="Reported Message", value=message.content[:2000] if message.content else "*No content*", inline=False)
+        embed.add_field(name="Message Link", value=f"[Jump to Message]({message.jump_url})", inline=False)
+
+        await channel.send(embed=embed)
