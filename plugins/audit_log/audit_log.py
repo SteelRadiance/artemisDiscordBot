@@ -155,6 +155,11 @@ class AuditLog(PluginInterface, PluginHelper):
             if not entry.guild:
                 return
             
+            # Skip invite creation events
+            action_name = entry.action.name.lower()
+            if 'invite' in action_name and 'create' in action_name:
+                return
+            
             info = await AuditLog.get_info(entry.guild, bot)
             if not info or not info.get("channel_id"):
                 return
