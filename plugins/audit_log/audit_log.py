@@ -28,6 +28,7 @@ from typing import Optional, Dict, Any
 
 from artemis.plugin.base import PluginInterface, PluginHelper
 from artemis.events.listener import EventListener
+from artemis.utils.helpers import emoji_hash
 
 logger = logging.getLogger("artemis.plugin.auditlog")
 
@@ -110,12 +111,42 @@ class AuditLog(PluginInterface, PluginHelper):
         try:
             storage = guild._state._get_client().storage if hasattr(guild._state, '_get_client') else None
             if storage:
+                # Get existing config to preserve event counter
+                info = await storage.get("auditlog", str(guild.id))
+                event_counter = info.get("event_counter", 0) if isinstance(info, dict) else 0
+                
                 await storage.set("auditlog", str(guild.id), {
                     "guild_id": str(guild.id),
-                    "channel_id": str(channel.id)
+                    "channel_id": str(channel.id),
+                    "event_counter": event_counter
                 })
         except Exception as e:
             logger.error(f"Failed to set audit log channel: {e}")
+    
+    @staticmethod
+    async def get_and_increment_event_counter(guild: disnake.Guild, bot) -> int:
+        """Get the current event counter and increment it for the next event."""
+        try:
+            storage = bot.storage if bot and hasattr(bot, 'storage') else None
+            if not storage:
+                storage = guild._state._get_client().storage if hasattr(guild._state, '_get_client') else None
+            
+            if not storage:
+                return 1
+            
+            info = await storage.get("auditlog", str(guild.id))
+            if not info or not isinstance(info, dict):
+                event_counter = 1
+                info = {"guild_id": str(guild.id), "event_counter": event_counter}
+            else:
+                event_counter = info.get("event_counter", 0) + 1
+                info["event_counter"] = event_counter
+            
+            await storage.set("auditlog", str(guild.id), info)
+            return event_counter
+        except Exception as e:
+            logger.error(f"Failed to get/increment event counter for guild {guild.id}: {e}")
+            return 1
     
     @staticmethod
     async def handle_audit_log_entry(bot, entry: disnake.AuditLogEntry):
@@ -132,15 +163,24 @@ class AuditLog(PluginInterface, PluginHelper):
             if not channel:
                 return
             
-            embed = AuditLog.create_audit_log_embed(entry)
+            # Get and increment event counter
+            event_number = await AuditLog.get_and_increment_event_counter(entry.guild, bot)
+            
+            # Generate emoji hash of event number and event time
+            event_time = entry.created_at if entry.created_at else datetime.now()
+            event_time_str = event_time.isoformat()
+            hash_input = f"{event_number}:{event_time_str}"
+            event_hash = emoji_hash(hash_input)
+            
+            embed = AuditLog.create_audit_log_embed(entry, event_number, event_hash)
             await channel.send(embed=embed)
             
-            logger.debug(f"Logged audit log entry {entry.id} for guild {entry.guild.name}")
+            logger.debug(f"Logged audit log entry {entry.id} (#{event_number}) for guild {entry.guild.name}")
         except Exception as e:
             logger.error(f"Error handling audit log entry: {e}", exc_info=True)
     
     @staticmethod
-    def create_audit_log_embed(entry: disnake.AuditLogEntry) -> Embed:
+    def create_audit_log_embed(entry: disnake.AuditLogEntry, event_number: int, event_hash: str) -> Embed:
         """Create an embed from an audit log entry."""
         # Determine color based on action type
         color = 0x3498db  # Default blue
@@ -167,6 +207,10 @@ class AuditLog(PluginInterface, PluginHelper):
             color=color,
             timestamp=entry.created_at if entry.created_at else datetime.now()
         )
+        
+        # Event number and hash
+        embed.add_field(name="Event #", value=str(event_number), inline=True)
+        embed.add_field(name="Hash", value=event_hash, inline=True)
         
         # User who performed the action
         if entry.user:
@@ -204,8 +248,11 @@ class AuditLog(PluginInterface, PluginHelper):
             embed.add_field(name="Changes", value=changes[:1024], inline=False)
         
         # Additional details
+        footer_parts = [f"Event #{event_number}"]
         if entry.id:
-            embed.set_footer(text=f"Entry ID: {entry.id} | Action Type: {entry.action.value}")
+            footer_parts.append(f"Entry ID: {entry.id}")
+        footer_parts.append(f"Action Type: {entry.action.value}")
+        embed.set_footer(text=" | ".join(footer_parts))
         
         return embed
     
