@@ -47,7 +47,7 @@ class AuditLog(PluginInterface, PluginHelper):
             EventListener.new()
             .add_command("auditlog")
             .set_callback(AuditLog.config)
-            .set_help("**Usage**: `!auditlog <channel_id>`\n\nConfigure the audit log logging channel. This command is admin only. The audit log plugin automatically logs moderation actions, role changes, channel modifications, and other server events to the configured channel.")
+            .set_help("**Usage**: `!auditlog <channel_id>`\n\nConfigure the audit log logging channel. This command is admin only. The audit log plugin automatically logs moderation actions, role changes, channel modifications, and other server events to the configured channel. Each event is numbered sequentially and includes an emoji-based hash for verification.")
         )
         
         @bot.event
