@@ -58,7 +58,6 @@ class AuditLog(PluginInterface, PluginHelper):
     async def get_info(guild: disnake.Guild, bot=None) -> Optional[Dict[str, Any]]:
         """Get audit log configuration for guild."""
         try:
-            # Try to get storage from bot if provided
             if bot and hasattr(bot, 'storage'):
                 storage = bot.storage
             else:
@@ -111,7 +110,6 @@ class AuditLog(PluginInterface, PluginHelper):
         try:
             storage = guild._state._get_client().storage if hasattr(guild._state, '_get_client') else None
             if storage:
-                # Get existing config to preserve event counter
                 info = await storage.get("auditlog", str(guild.id))
                 event_counter = info.get("event_counter", 0) if isinstance(info, dict) else 0
                 
@@ -155,10 +153,17 @@ class AuditLog(PluginInterface, PluginHelper):
             if not entry.guild:
                 return
             
-            # Skip invite creation events
             action_name = entry.action.name.lower()
             if 'invite' in action_name and 'create' in action_name:
                 return
+            
+            if entry.user and entry.user.id == bot.user.id:
+                if 'channel' in action_name and ('update' in action_name or 'change' in action_name):
+                    if entry.target and isinstance(entry.target, disnake.VoiceChannel):
+                        if entry.after:
+                            for key, value in entry.after:
+                                if key == 'name':
+                                    return  # Skip voice channel name changes by Artemis
             
             info = await AuditLog.get_info(entry.guild, bot)
             if not info or not info.get("channel_id"):
@@ -168,10 +173,8 @@ class AuditLog(PluginInterface, PluginHelper):
             if not channel:
                 return
             
-            # Get and increment event counter
             event_number = await AuditLog.get_and_increment_event_counter(entry.guild, bot)
             
-            # Generate emoji hash of event number and event time
             event_time = entry.created_at if entry.created_at else datetime.now()
             event_time_str = event_time.isoformat()
             hash_input = f"{event_number}:{event_time_str}"
@@ -187,10 +190,8 @@ class AuditLog(PluginInterface, PluginHelper):
     @staticmethod
     def create_audit_log_embed(entry: disnake.AuditLogEntry, event_number: int, event_hash: str) -> Embed:
         """Create an embed from an audit log entry."""
-        # Determine color based on action type
-        color = 0x3498db  # Default blue
+        color = 0x3498db
         
-        # Color coding by action category
         action_name = entry.action.name.lower()
         if 'ban' in action_name or 'kick' in action_name or 'prune' in action_name:
             color = 0xe74c3c  # Red for bans/kicks
@@ -252,7 +253,6 @@ class AuditLog(PluginInterface, PluginHelper):
         if changes:
             embed.add_field(name="Changes", value=changes[:1024], inline=False)
         
-        # Additional details
         footer_parts = [f"Event #{event_number}"]
         if entry.id:
             footer_parts.append(f"Entry ID: {entry.id}")
@@ -287,7 +287,6 @@ class AuditLog(PluginInterface, PluginHelper):
                 old_value = before_dict.get(key)
                 new_value = after_dict.get(key)
                 
-                # Format values for display
                 old_str = AuditLog._format_change_value(old_value)
                 new_str = AuditLog._format_change_value(new_value)
                 
@@ -311,9 +310,8 @@ class AuditLog(PluginInterface, PluginHelper):
         if isinstance(value, (list, tuple)):
             if len(value) == 0:
                 return "[]"
-            # Try to format list items
             formatted_items = []
-            for item in value[:5]:  # Limit to 5 items
+            for item in value[:5]:
                 formatted_items.append(str(item))
             result = ", ".join(formatted_items)
             if len(value) > 5:

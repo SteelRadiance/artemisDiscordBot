@@ -138,8 +138,6 @@ class User(PluginInterface, PluginHelper):
                 await data.message.reply("Unknown role. Type it out, @ it, or paste in the role ID.")
                 return
             
-            # Chunk the guild to ensure all members are loaded
-            # Check if we have significantly fewer members cached than the server reports
             cached_count = len(data.guild.members)
             server_count = data.guild.member_count or cached_count
             

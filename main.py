@@ -33,7 +33,6 @@ if __name__ == "__main__":
     logger = logging.getLogger("artemis")
     
     try:
-        # Load configuration
         try:
             from config import config
         except ImportError:

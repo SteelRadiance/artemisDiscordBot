@@ -91,7 +91,6 @@ class EventManager:
         """
         logger.info(f"Dispatching command: '{command}', available commands: {sorted(self.command_listeners.keys())}")
         
-        # Check for -help flag
         if parsed_args and "-help" in parsed_args:
             await self._handle_help(command, args[0] if args else None)
             return
@@ -106,7 +105,6 @@ class EventManager:
                 callback = callback_tuple[0]
                 filter_guild_id = callback_tuple[1] if len(callback_tuple) > 1 else None
                 
-                # Skip if guild filter doesn't match
                 if filter_guild_id is not None and guild_id != filter_guild_id:
                     logger.debug(f"Skipping command {command} due to guild filter: {filter_guild_id} != {guild_id}")
                     continue
@@ -134,7 +132,6 @@ class EventManager:
         
         help_text = None
         
-        # Get help text from registered help
         if command in self.command_help:
             help_source = self.command_help[command]
             if isinstance(help_source, str):

@@ -79,7 +79,6 @@ class Observer(PluginInterface, PluginHelper):
     async def get_info(guild: disnake.Guild, bot=None) -> dict:
         """Get observer configuration for guild."""
         try:
-            # Try to get storage from bot if provided
             if bot and hasattr(bot, 'storage'):
                 storage = bot.storage
             else:
@@ -293,7 +292,6 @@ class Observer(PluginInterface, PluginHelper):
         if payload.user_id == bot.user.id:
             return
         
-        # Get guild from bot
         guild = bot.get_guild(payload.guild_id)
         if not guild:
             return
@@ -303,7 +301,6 @@ class Observer(PluginInterface, PluginHelper):
             logger.debug(f"No observer channel configured for guild {guild.id}")
             return
         
-        # Get the observer channel
         channel = guild.get_channel(int(info["channel_id"]))
         if not channel:
             logger.warning(f"Observer channel {info['channel_id']} not found in guild {guild.id}")
@@ -318,14 +315,12 @@ class Observer(PluginInterface, PluginHelper):
             await channel.send(embed=embed)
             return
 
-        # Compare emoji IDs (handle both custom and unicode emojis)
         emoji_id = str(payload.emoji.id) if payload.emoji.id else str(payload.emoji)
         report_emote_id = str(info["report_emote"])
         
         if emoji_id != report_emote_id:
             return
         
-        # Fetch the message that was reacted to
         message_channel = guild.get_channel(payload.channel_id)
         if not message_channel:
             return
@@ -336,18 +331,15 @@ class Observer(PluginInterface, PluginHelper):
             logger.warning(f"Failed to fetch message {payload.message_id}: {e}")
             return
         
-        # Remove the reaction
         try:
             await message.remove_reaction(payload.emoji, payload.member or await guild.fetch_member(payload.user_id))
         except Exception as e:
             logger.warning(f"Failed to remove reaction: {e}")
 
-        # Get reporter
         reporter = payload.member or await guild.fetch_member(payload.user_id)
         if not reporter:
             reporter = await bot.fetch_user(payload.user_id)
         
-        # Create report embed
         embed = Embed(
             title="Message Reported",
             color=0xbf2222,

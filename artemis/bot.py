@@ -42,11 +42,6 @@ class ArtemisBot(commands.Bot):
         self.config = config
         
         intents = disnake.Intents.all()
-        # intents.message_content = True
-        # intents.messages = True
-        # intents.members = True  # Required to track member joins/leaves/updates
-        # intents.guilds = True  # Required to track guild events
-        # intents.expressions = True  # Required to track reaction events
         super().__init__(
             command_prefix=config.COMMAND_PREFIX,
             intents=intents,
@@ -171,7 +166,6 @@ class ArtemisBot(commands.Bot):
     
     async def on_member_update(self, before: disnake.Member, after: disnake.Member):
         """Handle member update (e.g., role changes) - member is already in cache."""
-        # Check if roles changed
         if before.roles != after.roles:
             logger.debug(f"Member {after.name}#{after.discriminator} roles updated in guild {after.guild.name}")
             # Member is already in cache, roles are automatically updated
@@ -184,7 +178,6 @@ class ArtemisBot(commands.Bot):
     async def _chunk_guild(self, guild: disnake.Guild):
         """Chunk (load) all members for a specific guild."""
         try:
-            # Check if we need to chunk
             cached_count = len(guild.members)
             server_count = guild.member_count or cached_count
             
@@ -212,16 +205,6 @@ class ArtemisBot(commands.Bot):
     def run(self) -> None:
         """Run the bot."""
         self.load_plugins()
-        
-        # Check if this is a restart - if so, wait 2 seconds before connecting
-        # import os
-        # if os.getenv('ARTEMIS_RESTART') == '1':
-        #     logger.info("Restart detected - waiting 2 seconds before connecting to Discord...")
-        #     import time
-        #     time.sleep(2)
-        #     # Clear the environment variable so it doesn't affect future starts
-        #     os.environ.pop('ARTEMIS_RESTART', None)
-        #     logger.info("Resuming startup...")
         
         token = self.config.BOT_TOKEN
         if not token or token == "your-bot-token-here":

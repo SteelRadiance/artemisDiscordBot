@@ -20,7 +20,6 @@ def setup_logging(level: str = "INFO", log_file: Optional[str] = None) -> None:
     # Convert string level to logging constant
     log_level = getattr(logging, level.upper(), logging.INFO)
     
-    # Create formatter
     formatter = logging.Formatter(
         fmt='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
         datefmt='%Y-%m-%d %H:%M:%S'
@@ -43,5 +42,4 @@ def setup_logging(level: str = "INFO", log_file: Optional[str] = None) -> None:
         file_handler.setLevel(log_level)
         root_logger.addHandler(file_handler)
     
-    # Set disnake logging level
     logging.getLogger("disnake").setLevel(logging.WARNING)

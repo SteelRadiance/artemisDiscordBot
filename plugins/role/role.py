@@ -63,7 +63,6 @@ class Role(PluginInterface, PluginHelper):
         """Save all roles to the roles file."""
         roles_file = Role._get_roles_file()
         try:
-            # Ensure logs directory exists
             await aiofiles.os.makedirs(roles_file.parent, exist_ok=True)
             
             async with aiofiles.open(roles_file, 'w', encoding='utf-8') as f:
@@ -154,7 +153,6 @@ class Role(PluginInterface, PluginHelper):
                 await p.send_unauthorized_message(data.message.channel)
                 return
             
-            # Get member from author - message.member might not always be available
             member = data.guild.get_member(data.message.author.id)
             if not member:
                 member = data.message.author if isinstance(data.message.author, disnake.Member) else None
@@ -200,7 +198,6 @@ class Role(PluginInterface, PluginHelper):
                 await data.message.reply("This command can only be used in a server.")
                 return
             
-            # Get member from author - message.member might not always be available
             member = data.guild.get_member(data.message.author.id)
             if not member:
                 member = data.message.author if isinstance(data.message.author, disnake.Member) else None
@@ -218,7 +215,6 @@ class Role(PluginInterface, PluginHelper):
                     break
             
             if not role:
-                # Try similarity matching
                 best_match = None
                 best_score = 0
                 for r in valid_roles:
@@ -262,13 +258,11 @@ class Role(PluginInterface, PluginHelper):
                 return
             
             role_id = None
-            # Try to parse as integer first
             try:
                 role_id = int(args[1])
             except ValueError:
                 pass
             
-            # If not an integer, try to parse as role mention or name
             if not role_id:
                 role = Role.parse_role(data.guild, args[1])
                 if not role:

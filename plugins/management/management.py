@@ -213,16 +213,12 @@ class Management(PluginInterface, PluginHelper):
             for plugin_class in bot.plugin_loader.loaded_plugins:
                 plugin_name = plugin_class.__name__
                 try:
-                    # Get the source file for the plugin class
                     plugin_file = inspect.getfile(plugin_class)
-                    # Read the plugin source code
                     with open(plugin_file, 'r', encoding='utf-8') as f:
                         plugin_code = f.read()
-                    # Hash the actual code
                     plugin_hash = emoji_hash(plugin_code)
                 except Exception as e:
                     logger.warning(f"Failed to hash plugin {plugin_name}: {e}")
-                    # Fallback to hashing the name if we can't read the file
                     plugin_hash = emoji_hash(f"plugin-{plugin_name}")
                 plugins_with_hashes.append(f"{plugin_name} {plugin_hash}")
             
@@ -303,12 +299,9 @@ class Management(PluginInterface, PluginHelper):
             args = Management.split_command(data.message.content)
             show_dependencies = "-dependencies" in args
             
-            # Check if this is a configuration command (channel ID provided)
-            # Only process if there's a second argument that looks like a channel ID (numeric)
             if len(args) > 1:
                 try:
                     channel_id = int(args[1])
-                    # This looks like a channel ID, so require admin access
                     admin_ids = getattr(data.artemis.config, 'ADMIN_USER_IDS', [])
                     if str(data.message.author.id) not in admin_ids:
                         await Management.unauthorized(data.message)
@@ -329,7 +322,6 @@ class Management(PluginInterface, PluginHelper):
                         await data.message.channel.send("Failed to set bot info channel.")
                     return
                 except ValueError:
-                    # Not a valid channel ID (e.g., "-dependencies" flag), treat as regular command
                     pass
             
             embed = Management.create_info_embed(data.artemis, show_dependencies)
@@ -612,9 +604,7 @@ class Management(PluginInterface, PluginHelper):
             
             args = Management.split_command(data.message.content)
             
-            # Check if this is a config command (role flag)
             if len(args) > 1 and args[1].lower() == "role":
-                # Admin-only configuration
                 admin_ids = getattr(data.artemis.config, 'ADMIN_USER_IDS', [])
                 if str(data.message.author.id) not in admin_ids:
                     await Management.unauthorized(data.message)
@@ -628,7 +618,6 @@ class Management(PluginInterface, PluginHelper):
                 try:
                     role_id = int(args[2])
                 except ValueError:
-                    # Try to parse as role mention or name
                     role = Management.parse_role(data.guild, args[2])
                     if not role:
                         await data.message.reply("Role not found. Use a role ID, mention (@Role), or role name.")

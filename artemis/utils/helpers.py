@@ -23,7 +23,6 @@ def split_command(content: str, prefix: str = "!") -> List[str]:
     if not content.startswith(prefix):
         return []
     
-    # Remove prefix and split
     content = content[len(prefix):].strip()
     return content.split()
 

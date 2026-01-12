@@ -41,14 +41,11 @@ class Permission:
         Returns:
             True if permission granted, False otherwise
         """
-        # Check if user is admin
         if self.message and self.message.author:
             admin_ids = getattr(self.bot.config, 'ADMIN_USER_IDS', [])
             if str(self.message.author.id) in admin_ids:
                 return True
         
-        # Check stored permissions (JSON-backed)
-        # For now, return default - can be extended with JSON storage
         return self.default
     
     async def send_unauthorized_message(self, channel) -> None:

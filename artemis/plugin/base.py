@@ -217,8 +217,6 @@ class PluginHelper:
         tz = pytz.timezone(timezone)
         now = datetime.now(tz)
         
-        # Try relative time first (e.g., "5 hours", "next tuesday")
-        # Simple relative parsing
         relative_patterns = [
             (r'(\d+)\s*h(?:ours?)?', lambda m: relativedelta(hours=int(m.group(1)))),
             (r'(\d+)\s*m(?:inutes?)?', lambda m: relativedelta(minutes=int(m.group(1)))),
