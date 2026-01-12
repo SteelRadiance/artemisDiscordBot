@@ -42,6 +42,7 @@ from typing import Optional
 from pathlib import Path
 import random
 import logging
+import inspect
 
 import disnake
 from disnake import Embed
@@ -207,11 +208,22 @@ class Management(PluginInterface, PluginHelper):
                 inline=False
             )
         
-        plugins = Management.get_plugins(bot)
-        if plugins:
+        if bot.plugin_loader.loaded_plugins:
             plugins_with_hashes = []
-            for plugin_name in plugins:
-                plugin_hash = emoji_hash(f"plugin-{plugin_name}")
+            for plugin_class in bot.plugin_loader.loaded_plugins:
+                plugin_name = plugin_class.__name__
+                try:
+                    # Get the source file for the plugin class
+                    plugin_file = inspect.getfile(plugin_class)
+                    # Read the plugin source code
+                    with open(plugin_file, 'r', encoding='utf-8') as f:
+                        plugin_code = f.read()
+                    # Hash the actual code
+                    plugin_hash = emoji_hash(plugin_code)
+                except Exception as e:
+                    logger.warning(f"Failed to hash plugin {plugin_name}: {e}")
+                    # Fallback to hashing the name if we can't read the file
+                    plugin_hash = emoji_hash(f"plugin-{plugin_name}")
                 plugins_with_hashes.append(f"{plugin_name} {plugin_hash}")
             
             plugins_text = "\n".join(plugins_with_hashes)
