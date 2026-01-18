@@ -1,0 +1,150 @@
+name: Deploy to EC2
+
+# GitHub Actions workflow for deploying Artemis Discord Bot to EC2
+# Triggers when code is pushed to the main branch (including after PR merges)
+
+on:
+  push:
+    branches:
+      - main
+
+# Required GitHub Secrets:
+# - EC2_HOST: EC2 instance hostname or IP address (e.g., ec2-xxx-xxx-xxx-xxx.compute-1.amazonaws.com or 1.2.3.4)
+# - EC2_USER: SSH username for EC2 (typically 'ec2-user' for Amazon Linux, 'ubuntu' for Ubuntu)
+# - EC2_SSH_KEY: Private SSH key content for EC2 access (the entire private key file contents)
+# - EC2_DEPLOY_PATH: Full path to bot directory on EC2 (e.g., /home/ubuntu/artemisDiscordBot)
+# - EC2_SCREEN_SESSION: Name of the screen session running the bot (e.g., artemis)
+#
+# To configure secrets:
+# 1. Go to your GitHub repository
+# 2. Navigate to Settings → Secrets and variables → Actions
+# 3. Click "New repository secret" for each secret above
+# 4. Paste the value and save
+
+jobs:
+  deploy:
+    name: Deploy Bot to EC2
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Configure SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.EC2_SSH_KEY }}" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keyscan -H ${{ secrets.EC2_HOST }} >> ~/.ssh/known_hosts 2>/dev/null || true
+        shell: bash
+
+      - name: Test SSH Connection
+        run: |
+          ssh -i ~/.ssh/deploy_key \
+              -o StrictHostKeyChecking=no \
+              -o UserKnownHostsFile=~/.ssh/known_hosts \
+              ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }} \
+              "echo 'SSH connection successful'"
+        shell: bash
+
+      - name: Pull Latest Code
+        run: |
+          echo "Pulling latest code from main branch..."
+          ssh -i ~/.ssh/deploy_key \
+              -o StrictHostKeyChecking=no \
+              -o UserKnownHostsFile=~/.ssh/known_hosts \
+              ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }} \
+              "cd ${{ secrets.EC2_DEPLOY_PATH }} && \
+               git fetch origin && \
+               git reset --hard origin/main && \
+               git clean -fd && \
+               echo '✓ Code updated successfully' || \
+               (echo '✗ Failed to update code' && exit 1)"
+        shell: bash
+
+      - name: Install/Update Dependencies
+        run: |
+          echo "Installing/updating Python dependencies..."
+          ssh -i ~/.ssh/deploy_key \
+              -o StrictHostKeyChecking=no \
+              -o UserKnownHostsFile=~/.ssh/known_hosts \
+              ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }} \
+              "cd ${{ secrets.EC2_DEPLOY_PATH }} && \
+               if [ -d venv ] || [ -d env ] || [ -d .venv ]; then \
+                 source \$(ls -d venv env .venv | head -1)/bin/activate && \
+                 pip install --upgrade pip && \
+                 pip install -r requirements.txt && \
+                 echo '✓ Dependencies installed successfully (virtualenv)'; \
+               else \
+                 pip3 install --user --upgrade pip && \
+                 pip3 install --user -r requirements.txt && \
+                 echo '✓ Dependencies installed successfully (system Python)'; \
+               fi || (echo '✗ Failed to install dependencies' && exit 1)"
+        shell: bash
+
+      - name: Stop Existing Bot Process
+        run: |
+          echo "Stopping existing bot process..."
+          ssh -i ~/.ssh/deploy_key \
+              -o StrictHostKeyChecking=no \
+              -o UserKnownHostsFile=~/.ssh/known_hosts \
+              ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }} \
+              "if screen -list | grep -q ${{ secrets.EC2_SCREEN_SESSION }}; then \
+                 screen -S ${{ secrets.EC2_SCREEN_SESSION }} -X quit && \
+                 echo '✓ Stopped screen session'; \
+               elif pgrep -f 'python.*main.py' > /dev/null; then \
+                 pkill -f 'python.*main.py' && \
+                 echo '✓ Stopped bot process'; \
+               else \
+                 echo 'ℹ No existing bot process found'; \
+               fi"
+        shell: bash
+        continue-on-error: true
+
+      - name: Wait for Process Termination
+        run: |
+          echo "Waiting for process termination..."
+          sleep 3
+        shell: bash
+
+      - name: Start Bot in Screen Session
+        run: |
+          echo "Starting bot in screen session '${{ secrets.EC2_SCREEN_SESSION }}'..."
+          ssh -i ~/.ssh/deploy_key \
+              -o StrictHostKeyChecking=no \
+              -o UserKnownHostsFile=~/.ssh/known_hosts \
+              ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }} \
+              "cd ${{ secrets.EC2_DEPLOY_PATH }} && \
+               if [ -d venv ] || [ -d env ] || [ -d .venv ]; then \
+                 source \$(ls -d venv env .venv | head -1)/bin/activate && \
+                 screen -dmS ${{ secrets.EC2_SCREEN_SESSION }} python3 main.py && \
+                 echo '✓ Bot started in screen session (virtualenv)'; \
+               else \
+                 screen -dmS ${{ secrets.EC2_SCREEN_SESSION }} python3 main.py && \
+                 echo '✓ Bot started in screen session (system Python)'; \
+               fi || (echo '✗ Failed to start bot' && exit 1)"
+        shell: bash
+
+      - name: Verify Deployment
+        run: |
+          echo "Verifying deployment..."
+          ssh -i ~/.ssh/deploy_key \
+              -o StrictHostKeyChecking=no \
+              -o UserKnownHostsFile=~/.ssh/known_hosts \
+              ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }} \
+              "sleep 2 && \
+               if screen -list | grep -q ${{ secrets.EC2_SCREEN_SESSION }}; then \
+                 echo '✓ Screen session is active'; \
+                 if ps aux | grep -v grep | grep -q 'python.*main.py'; then \
+                   echo '✓ Bot process is running'; \
+                   echo '✓ Deployment verified successfully'; \
+                 else \
+                   echo '✗ Bot process not found' && exit 1; \
+                 fi; \
+               else \
+                 echo '✗ Screen session not found' && exit 1; \
+               fi"
+        shell: bash
+
+      - name: Cleanup SSH Key
+        if: always()
+        run: |
+          rm -f ~/.ssh/deploy_key
+        shell: bash
