@@ -98,8 +98,12 @@ class Observer(PluginInterface, PluginHelper):
     async def config(data):
         """Handle observer config command."""
         try:
-            admin_ids = getattr(data.artemis.config, 'ADMIN_USER_IDS', [])
-            if str(data.message.author.id) not in admin_ids:
+            from artemis.permissions.guild_permissions import has_admin_access
+            
+            user_id = str(data.message.author.id)
+            guild_id = str(data.message.guild.id) if data.message.guild else None
+            
+            if not await has_admin_access(user_id, guild_id, data.artemis):
                 await Observer.unauthorized(data.message)
                 return
             

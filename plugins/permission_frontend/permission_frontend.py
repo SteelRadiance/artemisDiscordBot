@@ -163,8 +163,11 @@ class PermissionFrontend(PluginInterface, PluginHelper):
                 await data.message.reply("Cannot determine user information.")
                 return
             
-            admin_ids = getattr(data.artemis.config, 'ADMIN_USER_IDS', [])
-            is_admin = str(data.message.author.id) in admin_ids
+            from artemis.permissions.guild_permissions import has_admin_access
+            
+            user_id = str(data.message.author.id)
+            guild_id = str(data.message.guild.id) if data.message.guild else None
+            is_admin = await has_admin_access(user_id, guild_id, data.artemis)
             
             all_perms = await data.artemis.storage.get_all("permissions")
             
@@ -515,8 +518,11 @@ class PermissionFrontend(PluginInterface, PluginHelper):
     @staticmethod
     async def has_permission_permission(setting: int, target: int, data) -> bool:
         """Check if user can modify permissions."""
-        admin_ids = getattr(data.artemis.config, 'ADMIN_USER_IDS', [])
-        is_admin = str(data.message.author.id) in admin_ids
+        from artemis.permissions.guild_permissions import has_admin_access
+        
+        user_id = str(data.message.author.id)
+        guild_id = str(data.message.guild.id) if data.message.guild else None
+        is_admin = await has_admin_access(user_id, guild_id, data.artemis)
         
         if setting == PermissionFrontend.SETTING_GLOBAL or target == PermissionFrontend.TARGET_BOTADMIN:
             return is_admin

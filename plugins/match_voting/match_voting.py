@@ -103,8 +103,12 @@ class MatchVoting(PluginInterface, PluginHelper):
         try:
             member = data.guild.get_member(data.message.author.id) if data.guild else None
             if not member or not member.guild_permissions.manage_roles:
-                admin_ids = getattr(data.artemis.config, 'ADMIN_USER_IDS', [])
-                if str(data.message.author.id) not in admin_ids:
+                from artemis.permissions.guild_permissions import has_admin_access
+                
+                user_id = str(data.message.author.id)
+                guild_id = str(data.message.guild.id) if data.message.guild else None
+                
+                if not await has_admin_access(user_id, guild_id, data.artemis):
                     await MatchVoting.unauthorized(data.message)
                     return
             
@@ -146,8 +150,12 @@ class MatchVoting(PluginInterface, PluginHelper):
         try:
             member = data.guild.get_member(data.message.author.id) if data.guild else None
             if not member or not member.guild_permissions.manage_roles:
-                admin_ids = getattr(data.artemis.config, 'ADMIN_USER_IDS', [])
-                if str(data.message.author.id) not in admin_ids:
+                from artemis.permissions.guild_permissions import has_admin_access
+                
+                user_id = str(data.message.author.id)
+                guild_id = str(data.message.guild.id) if data.message.guild else None
+                
+                if not await has_admin_access(user_id, guild_id, data.artemis):
                     await MatchVoting.unauthorized(data.message)
                     return
             
@@ -227,8 +235,12 @@ class MatchVoting(PluginInterface, PluginHelper):
     async def announce_match(data, args: list):
         """Announce a match."""
         try:
-            admin_ids = getattr(data.artemis.config, 'ADMIN_USER_IDS', [])
-            if str(data.message.author.id) not in admin_ids:
+            from artemis.permissions.guild_permissions import has_admin_access
+            
+            user_id = str(data.message.author.id)
+            guild_id = str(data.message.guild.id) if data.message.guild else None
+            
+            if not await has_admin_access(user_id, guild_id, data.artemis):
                 await MatchVoting.unauthorized(data.message)
                 return
             
@@ -313,8 +325,11 @@ class MatchVoting(PluginInterface, PluginHelper):
             resp.append(f"Deadline: *{deadline.strftime('%Y-%m-%d %H:%M:%S UTC')}*")
             resp.append("")
             
-            admin_ids = getattr(data.artemis.config, 'ADMIN_USER_IDS', [])
-            is_admin = str(data.message.author.id) in admin_ids
+            from artemis.permissions.guild_permissions import has_admin_access
+            
+            user_id = str(data.message.author.id)
+            guild_id = str(data.message.guild.id) if data.message.guild else None
+            is_admin = await has_admin_access(user_id, guild_id, data.artemis)
             
             total_votes = len(votes)
             resp.append(f"Total votes: {total_votes}")

@@ -11,10 +11,8 @@ BOT_TOKEN = "your-bot-token-here"
 # Logging
 LOG_LEVEL = "INFO"  # DEBUG, INFO, WARNING, ERROR
 
-# Admin User IDs (Discord user IDs who can execute admin commands)
-ADMIN_USER_IDS = [
-    # "123456789012345678",  # Example admin user ID
-]
+# Super Admin User ID (Discord user ID who can set guild admins when no admin exists)
+SUPER_ADMIN_ID = "123456789012345678"  # Example super admin user ID
 
 # Storage directory
 STORAGE_DIR = "storage"

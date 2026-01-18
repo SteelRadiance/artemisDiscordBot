@@ -160,9 +160,55 @@ class ArtemisBot(commands.Bot):
         # Member is automatically cached when they join, no action needed
     
     async def on_member_remove(self, member: disnake.Member):
-        """Handle member leave - member will be removed from cache automatically."""
+        """Handle member leave - check for admin/moderator removal and handle promotions."""
         logger.debug(f"Member {member.name}#{member.discriminator} left guild {member.guild.name}")
-        # Member will be automatically removed from cache, no action needed
+        
+        try:
+            from artemis.permissions.guild_permissions import (
+                is_guild_admin,
+                is_guild_moderator,
+                get_random_moderator,
+                set_guild_admin,
+                remove_guild_moderator,
+                get_guild_permissions
+            )
+            
+            guild_id = str(member.guild.id)
+            user_id = str(member.id)
+            
+            # Check if leaving member is a guild admin
+            if await is_guild_admin(user_id, guild_id, self):
+                logger.info(f"Guild admin {member.name} left guild {member.guild.name}")
+                
+                # Check if there are moderators
+                random_mod = await get_random_moderator(guild_id, self)
+                
+                if random_mod:
+                    # Promote random moderator to admin
+                    if await set_guild_admin(guild_id, random_mod, self):
+                        logger.info(f"Promoted moderator {random_mod} to admin in guild {member.guild.name}")
+                        
+                        # Remove them from moderator list (set_guild_admin doesn't do this automatically)
+                        await remove_guild_moderator(guild_id, random_mod, self)
+                    else:
+                        logger.error(f"Failed to promote moderator {random_mod} to admin in guild {member.guild.name}")
+                else:
+                    # No moderators - remove admin, allowing super_admin to set new admin
+                    permissions = await get_guild_permissions(guild_id, self)
+                    if permissions:
+                        permissions["admin_id"] = None
+                        await self.storage.set("guild_permissions", guild_id, permissions)
+                        logger.info(f"Removed admin from guild {member.guild.name} - no moderators available")
+            
+            # Check if leaving member is a guild moderator
+            elif await is_guild_moderator(user_id, guild_id, self):
+                logger.info(f"Guild moderator {member.name} left guild {member.guild.name}")
+                
+                # Remove moderator from list
+                if await remove_guild_moderator(guild_id, user_id, self):
+                    logger.info(f"Removed moderator {user_id} from guild {member.guild.name}")
+        except Exception as e:
+            logger.error(f"Error handling member leave for guild {member.guild.name}: {e}", exc_info=True)
     
     async def on_member_update(self, before: disnake.Member, after: disnake.Member):
         """Handle member update (e.g., role changes) - member is already in cache."""

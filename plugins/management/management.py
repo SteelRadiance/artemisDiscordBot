@@ -302,8 +302,12 @@ class Management(PluginInterface, PluginHelper):
             if len(args) > 1:
                 try:
                     channel_id = int(args[1])
-                    admin_ids = getattr(data.artemis.config, 'ADMIN_USER_IDS', [])
-                    if str(data.message.author.id) not in admin_ids:
+                    from artemis.permissions.guild_permissions import has_admin_access
+                    
+                    user_id = str(data.message.author.id)
+                    guild_id = str(data.message.guild.id) if data.message.guild else None
+                    
+                    if not await has_admin_access(user_id, guild_id, data.artemis):
                         await Management.unauthorized(data.message)
                         return
                     
@@ -353,8 +357,12 @@ class Management(PluginInterface, PluginHelper):
     async def invite(data):
         """Handle invite command."""
         try:
-            admin_ids = getattr(data.artemis.config, 'ADMIN_USER_IDS', [])
-            if str(data.message.author.id) not in admin_ids:
+            from artemis.permissions.guild_permissions import has_admin_access
+            
+            user_id = str(data.message.author.id)
+            guild_id = str(data.message.guild.id) if data.message.guild else None
+            
+            if not await has_admin_access(user_id, guild_id, data.artemis):
                 await Management.unauthorized(data.message)
                 return
             
@@ -423,8 +431,11 @@ class Management(PluginInterface, PluginHelper):
             all_commands = set(data.artemis.eventManager.command_listeners.keys())
             
             available_commands = {}
-            admin_ids = getattr(data.artemis.config, 'ADMIN_USER_IDS', [])
-            is_admin = str(data.message.author.id) in admin_ids
+            from artemis.permissions.guild_permissions import has_admin_access
+            
+            user_id = str(data.message.author.id)
+            guild_id = str(data.message.guild.id) if data.message.guild else None
+            is_admin = await has_admin_access(user_id, guild_id, data.artemis)
             
             for cmd in sorted(all_commands):
                 if cmd not in command_info:
@@ -605,8 +616,12 @@ class Management(PluginInterface, PluginHelper):
             args = Management.split_command(data.message.content)
             
             if len(args) > 1 and args[1].lower() == "role":
-                admin_ids = getattr(data.artemis.config, 'ADMIN_USER_IDS', [])
-                if str(data.message.author.id) not in admin_ids:
+                from artemis.permissions.guild_permissions import has_admin_access
+                
+                user_id = str(data.message.author.id)
+                guild_id = str(data.message.guild.id) if data.message.guild else None
+                
+                if not await has_admin_access(user_id, guild_id, data.artemis):
                     await Management.unauthorized(data.message)
                     return
                 

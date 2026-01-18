@@ -6,6 +6,7 @@ Permission resolver for checking user permissions
 
 from typing import Optional
 import logging
+from artemis.permissions.guild_permissions import has_admin_access
 
 logger = logging.getLogger("artemis.permissions")
 
@@ -42,8 +43,10 @@ class Permission:
             True if permission granted, False otherwise
         """
         if self.message and self.message.author:
-            admin_ids = getattr(self.bot.config, 'ADMIN_USER_IDS', [])
-            if str(self.message.author.id) in admin_ids:
+            user_id = str(self.message.author.id)
+            guild_id = str(self.message.guild.id) if self.message.guild else None
+            
+            if await has_admin_access(user_id, guild_id, self.bot):
                 return True
         
         return self.default
