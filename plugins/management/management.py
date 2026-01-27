@@ -84,6 +84,13 @@ class Management(PluginInterface, PluginHelper):
             .set_help("**Usage**: `!artemis [channel_id]`\n\nDisplays bot information including memory usage, Python version, uptime, guild/channel counts, loaded plugins, and dependencies. Admin can use `!artemis <channel_id>` to set the channel for periodic bot info messages.")
         )
         
+        bot.eventManager.add_listener(
+            EventListener.new()
+            .add_command("apollo")
+            .set_callback(Management.info)
+            .set_help("**Usage**: `!apollo [channel_id]`\n\nDisplays bot information including memory usage, Python version, uptime, guild/channel counts, loaded plugins, and dependencies. Admin can use `!apollo <channel_id>` to set the channel for periodic bot info messages.")
+        )
+        
         # bot.eventManager.add_listener(
         #     EventListener.new()
         #     .add_command("restart")
@@ -376,6 +383,7 @@ class Management(PluginInterface, PluginHelper):
             command_info = {
                 "ping": (None, True, "Test bot latency", "Management"),
                 "artemis": (None, True, "Display bot information and statistics", "Management"),
+                "apollo": (None, True, "Display bot information and statistics", "Management"),
                 "help": (None, True, "List all available commands", "Management"),
                 "invite": (None, False, "Generate bot invite URL (admin only)", "Management"),
                 
