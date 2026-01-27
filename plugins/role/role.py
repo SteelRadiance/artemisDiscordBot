@@ -9,6 +9,7 @@ bind roles to be self-assignable, and users can toggle them on/off.
 Commands:
     !role [role_name] - Toggle a role (or list available roles)
     !roles - List all self-assignable roles
+    !roles -list - List all server roles with their IDs
     !bindrole <role_id> - Make a role self-assignable (admin)
 
 Features:
@@ -79,7 +80,7 @@ class Role(PluginInterface, PluginHelper):
             bot.log.info("Not adding role commands on testing.")
             return
         
-        role_help = "**Usage**: `!role [role_name]` or `!roles`\n\nToggle a self-assignable role on/off. If no role is specified or you use `!roles`, lists all available self-assignable roles. Requires permission `p.roles.toggle`."
+        role_help = "**Usage**: `!role [role_name]` or `!roles [-list]`\n\nToggle a self-assignable role on/off. If no role is specified or you use `!roles`, lists all available self-assignable roles. Use `!roles -list` to see all server roles with their IDs. Requires permission `p.roles.toggle`."
         for cmd in ["role", "roles"]:
             bot.eventManager.add_listener(
                 EventListener.new()
@@ -118,13 +119,19 @@ class Role(PluginInterface, PluginHelper):
                 await data.message.reply("This command can only be used in a server.")
                 return
             
+            args = Role.split_command(data.message.content)
+            
+            # Check for -list flag (only works with !roles command)
+            if len(args) >= 2 and args[0].lower() == "roles" and args[1].lower() == "-list":
+                await Role.list_all_roles(data)
+                return
+            
             p = Permission("p.roles.toggle", data.artemis, True)
             p.add_message_context(data.message)
             if not await p.resolve():
                 await p.send_unauthorized_message(data.message.channel)
                 return
             
-            args = Role.split_command(data.message.content)
             if len(args) < 2:
                 await Role.give_list(data)
                 return
@@ -136,6 +143,63 @@ class Role(PluginInterface, PluginHelper):
                 return
             
             await Role.toggle_role(data, role_name)
+        except Exception as e:
+            await Role.exception_handler(data.message, e, True)
+    
+    @staticmethod
+    async def list_all_roles(data):
+        """Show list of all server roles with their IDs."""
+        try:
+            if not data.guild:
+                await data.message.reply("This command can only be used in a server.")
+                return
+            
+            p = Permission("p.roles.list", data.artemis, True)
+            p.add_message_context(data.message)
+            if not await p.resolve():
+                await p.send_unauthorized_message(data.message.channel)
+                return
+            
+            member = data.guild.get_member(data.message.author.id)
+            if not member:
+                member = data.message.author if isinstance(data.message.author, disnake.Member) else None
+            
+            if not member:
+                await data.message.reply("Could not find member information.")
+                return
+            
+            # Get all roles on the server (excluding @everyone)
+            all_roles = [role for role in data.guild.roles if role.id != data.guild.id]
+            
+            if not all_roles:
+                await data.message.reply("No roles found on this server!")
+                return
+            
+            # Sort roles by position (highest first)
+            sorted_roles = sorted(all_roles, key=lambda r: r.position, reverse=True)
+            
+            # Format: Role Name (ID: 123456789)
+            roles_text = "\n".join([f"{role.mention} (ID: `{role.id}`)" for role in sorted_roles])
+            
+            embed = Embed(
+                title=f"All Server Roles - {data.guild.name}",
+                description=f"Total roles: {len(sorted_roles)}",
+                color=member.color if member.color.value else 0x00ff00
+            )
+            
+            # Discord embed field value limit is 1024 characters
+            if len(roles_text) > 1024:
+                chunks = [roles_text[i:i+1024] for i in range(0, len(roles_text), 1024)]
+                for i, chunk in enumerate(chunks):
+                    embed.add_field(
+                        name="Roles" if i == 0 else "Roles (cont.)",
+                        value=chunk,
+                        inline=False
+                    )
+            else:
+                embed.add_field(name="Roles", value=roles_text, inline=False)
+            
+            await data.message.reply(embed=embed)
         except Exception as e:
             await Role.exception_handler(data.message, e, True)
     
