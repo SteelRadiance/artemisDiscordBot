@@ -83,6 +83,9 @@ class ArtemisBot(commands.Bot):
         self.eventManager.start_periodic_tasks()
         
         await self.eventManager.dispatch_event("ready", self)
+        
+        # Send !artemis command output to audit log channels on startup
+        await self._send_startup_info_to_audit_logs()
     
     async def _set_status(self):
         """Set the bot's presence status to online with configured activity."""
@@ -194,6 +197,38 @@ class ArtemisBot(commands.Bot):
                 logger.debug(f"Guild {guild.name} ({guild.id}) already has {cached_count}/{server_count} members cached, skipping chunk")
         except Exception as e:
             logger.error(f"Error chunking guild {guild.name} ({guild.id}): {e}")
+    
+    async def _send_startup_info_to_audit_logs(self):
+        """Send !artemis command output to audit log channels on startup."""
+        try:
+            # Dynamically import plugin modules to avoid circular dependencies
+            try:
+                from plugins.audit_log.audit_log import AuditLog
+                from plugins.management.management import Management
+            except ImportError:
+                logger.debug("Audit log or management plugins not available, skipping startup info")
+                return
+            
+            # Create the info embed (same as !artemis command)
+            embed = Management.create_info_embed(self, show_dependencies=False)
+            
+            # Send to audit log channels for each guild
+            for guild in self.guilds:
+                try:
+                    info = await AuditLog.get_info(guild, self)
+                    if not info or not info.get("channel_id"):
+                        continue
+                    
+                    channel = guild.get_channel(int(info["channel_id"]))
+                    if not channel:
+                        continue
+                    
+                    await channel.send(embed=embed)
+                    logger.info(f"Sent startup bot info to audit log channel in {guild.name} ({guild.id})")
+                except Exception as e:
+                    logger.warning(f"Failed to send startup info to audit log channel in {guild.name} ({guild.id}): {e}")
+        except Exception as e:
+            logger.error(f"Error sending startup info to audit logs: {e}", exc_info=True)
     
     def load_plugins(self) -> None:
         """Load all plugins."""

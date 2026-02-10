@@ -74,8 +74,6 @@ class Agenda(PluginInterface, PluginHelper):
                 await data.message.reply("Could not find that message.")
                 return
             
-            import_msg = await data.message.channel.fetch_message(import_msg.id)
-            
             staff_role_id = config.get('staffRole', 0)
             staff_members = {}
             if staff_role_id:
