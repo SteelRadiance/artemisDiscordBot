@@ -157,6 +157,11 @@ class AuditLog(PluginInterface, PluginHelper):
             if 'invite' in action_name and 'create' in action_name:
                 return
             
+            # Skip "talking stick" role assignments (MEMBER_ROLE_UPDATE)
+            if 'member_role_update' in action_name:
+                if AuditLog._is_talking_stick_role_change(entry):
+                    return
+            
             if entry.user and entry.user.id == bot.user.id:
                 if 'channel' in action_name and ('update' in action_name or 'change' in action_name):
                     if entry.target and isinstance(entry.target, disnake.VoiceChannel):
@@ -260,6 +265,24 @@ class AuditLog(PluginInterface, PluginHelper):
         embed.set_footer(text=" | ".join(footer_parts))
         
         return embed
+    
+    @staticmethod
+    def _is_talking_stick_role_change(entry: disnake.AuditLogEntry) -> bool:
+        """Check if this MEMBER_ROLE_UPDATE involves a role named 'talking stick'."""
+        for change_source in (entry.before, entry.after):
+            if not change_source:
+                continue
+            for key, value in change_source:
+                if key in ('$add', '$remove') and value:
+                    for role in (value if isinstance(value, (list, tuple)) else [value]):
+                        role_name = None
+                        if hasattr(role, 'name'):
+                            role_name = getattr(role, 'name', None)
+                        elif isinstance(role, dict) and 'name' in role:
+                            role_name = role.get('name')
+                        if role_name and 'talking stick' in str(role_name).lower():
+                            return True
+        return False
     
     @staticmethod
     def _format_changes(entry: disnake.AuditLogEntry) -> str:
