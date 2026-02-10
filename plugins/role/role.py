@@ -10,6 +10,7 @@ Commands:
     !role [role_name] - Toggle a role (or list available roles)
     !roles - List all self-assignable roles
     !roles -list - List all server roles with their IDs
+    !listroles - List all server roles with their IDs
     !bindrole <role_id> - Make a role self-assignable (admin)
 
 Features:
@@ -88,6 +89,13 @@ class Role(PluginInterface, PluginHelper):
                 .set_callback(Role.role_entry)
                 .set_help(role_help)
             )
+        
+        bot.eventManager.add_listener(
+            EventListener.new()
+            .add_command("listroles")
+            .set_callback(Role.list_all_roles)
+            .set_help("**Usage**: `!listroles`\n\nList all server roles with their IDs. Requires permission `p.roles.list`.")
+        )
         
         bot.eventManager.add_listener(
             EventListener.new()
