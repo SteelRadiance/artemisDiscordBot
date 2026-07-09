@@ -153,6 +153,10 @@ class EventManager:
     
     def start_periodic_tasks(self) -> None:
         """Start all registered periodic tasks."""
+        if self._periodic_task_handles:
+            logger.debug("Periodic tasks already running, skipping duplicate start")
+            return
+
         for interval, callback in self.periodic_tasks:
             task = asyncio.create_task(self._run_periodic(interval, callback))
             self._periodic_task_handles.append(task)

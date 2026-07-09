@@ -59,27 +59,56 @@ class Remind(PluginInterface, PluginHelper):
         )
     
     @staticmethod
+    def parse_remind_args(content: str, timezone: str = "UTC"):
+        """
+        Split command content into a when-string and reminder message.
+
+        Tries the longest leading token sequence that parses as a valid time
+        so inputs like "5 hours" or "next tuesday" are not truncated to a
+        single token.
+        """
+        parts = Remind.split_command(content)
+        if len(parts) < 2:
+            return None, None
+
+        for num_tokens in range(len(parts) - 1, 0, -1):
+            time_str = " ".join(parts[1:1 + num_tokens])
+            text = " ".join(parts[1 + num_tokens:])
+            try:
+                Remind.read_time(time_str, timezone)
+                return time_str, text or None
+            except ValueError:
+                continue
+
+        return parts[1], " ".join(parts[2:]) if len(parts) > 2 else None
+
+    @staticmethod
     async def remind_me(data):
         """Handle remind command."""
         try:
-            time_str = Remind.arg_substr(data.message.content, 1, 1)
-            text = Remind.arg_substr(data.message.content, 2)
-            
-            if not time_str or time_str == "help":
-                await data.message.reply(Remind.get_help())
-                return
-            elif time_str in ["del", "delete"]:
-                await Remind.delete_reminder(data, text)
-                return
-            
-            if not text:
-                text = "*No reminder message left*"
-            
             from plugins.localization.localization import Localization
             member = data.guild.get_member(data.message.author.id) if data.guild else None
             user_tz_str = await Localization.fetch_timezone(member) if member else None
             if not user_tz_str:
                 user_tz_str = "UTC"
+
+            parts = Remind.split_command(data.message.content)
+            if len(parts) < 2 or parts[1].lower() == "help":
+                await data.message.reply(Remind.get_help())
+                return
+            if parts[1].lower() in ("del", "delete"):
+                reminder_id = Remind.arg_substr(data.message.content, 2)
+                await Remind.delete_reminder(data, reminder_id)
+                return
+
+            time_str, text = Remind.parse_remind_args(data.message.content, user_tz_str)
+            
+            if not time_str:
+                await data.message.reply(Remind.get_help())
+                return
+            
+            if not text:
+                text = "*No reminder message left*"
             
             try:
                 parsed_time = Remind.read_time(time_str, user_tz_str)
@@ -162,7 +191,7 @@ class Remind(PluginInterface, PluginHelper):
                 await data.message.reply(f"No reminder matching `{reminder_id}` was found.")
                 return
             
-            if reminder.get("member_id") != str(data.message.author.id):
+            if reminder.get("member_id") != str(data.message.author.id) and not data.message.author.guild_permissions.administrator:
                 from artemis.permissions.resolver import Permission
                 p = Permission("p.reminder.delete", data.artemis, False)
                 p.add_message_context(data.message)
@@ -196,8 +225,9 @@ class Remind(PluginInterface, PluginHelper):
                 try:
                     remind_time = datetime.fromisoformat(remind_time_str.replace('Z', '+00:00'))
                     if remind_time <= now:
-                        await Remind.send_reminder(bot, value)
-                        await bot.storage.delete("remind", key)
+                        deleted = await bot.storage.delete("remind", key)
+                        if deleted:
+                            await Remind.send_reminder(bot, value)
                 except Exception as e:
                     logger.error(f"Error processing reminder: {e}")
         except Exception as e:
