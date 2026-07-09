@@ -54,7 +54,7 @@ class Remind(PluginInterface, PluginHelper):
         
         bot.eventManager.add_listener(
             EventListener.new()
-            .set_periodic(10)
+            .set_periodic(1)
             .set_callback(Remind.reminder_poll)
         )
     
