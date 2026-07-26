@@ -218,19 +218,24 @@ class PluginHelper:
         now = datetime.now(tz)
         
         relative_patterns = [
+            (r'(\d+)\s*y(?:ears?)?', lambda m: relativedelta(years=int(m.group(1)))),
+            (r'(\d+)\s*mo(?:nths?)?', lambda m: relativedelta(months=int(m.group(1)))),
+            (r'(\d+)\s*w(?:eeks?)?', lambda m: relativedelta(weeks=int(m.group(1)))),
+            (r'(\d+)\s*d(?:ays?)?', lambda m: relativedelta(days=int(m.group(1)))),
             (r'(\d+)\s*h(?:ours?)?', lambda m: relativedelta(hours=int(m.group(1)))),
             (r'(\d+)\s*m(?:inutes?)?', lambda m: relativedelta(minutes=int(m.group(1)))),
-            (r'(\d+)\s*d(?:ays?)?', lambda m: relativedelta(days=int(m.group(1)))),
-            (r'(\d+)\s*w(?:eeks?)?', lambda m: relativedelta(weeks=int(m.group(1)))),
+            (r'(\d+)\s*s(?:ec(?:onds?)?)?', lambda m: relativedelta(seconds=int(m.group(1)))),
         ]
         
         delta = relativedelta()
         remaining = time_str.lower()
         for pattern, func in relative_patterns:
-            match = re.search(pattern, remaining)
-            if match:
+            while True:
+                match = re.search(pattern, remaining)
+                if not match:
+                    break
                 delta += func(match)
-                remaining = remaining.replace(match.group(0), '').strip()
+                remaining = remaining.replace(match.group(0), '', 1).strip()
         
         if delta != relativedelta():
             result = now + delta

@@ -6,6 +6,7 @@ Helper utility functions
 
 import re
 import hashlib
+import shlex
 from typing import List, Optional
 
 
@@ -24,7 +25,10 @@ def split_command(content: str, prefix: str = "!") -> List[str]:
         return []
     
     content = content[len(prefix):].strip()
-    return content.split()
+    try:
+        return shlex.split(content)
+    except ValueError:
+        return content.split()
 
 
 def arg_substr(content: str, index: int, length: Optional[int] = None) -> Optional[str]:
