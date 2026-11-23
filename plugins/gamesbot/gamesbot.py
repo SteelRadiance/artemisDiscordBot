@@ -9,8 +9,8 @@ or remove game tags, view all available game tags, and ping everyone with a
 particular game tag.
 
 Commands:
-    !gamesbot add <game> - Add yourself to a game tag
-    !gamesbot remove <game> - Remove yourself from a game tag
+    !gamesbot add [-p user] <game> - Add yourself (or another user) to a game tag
+    !gamesbot remove [-p user] <game> - Remove yourself (or another user) from a game tag
     !gamesbot list - List all game tags and member counts
     !gamesbot ping <game> - Ping all members with a game tag
     
@@ -93,18 +93,41 @@ class GamesBot(PluginInterface, PluginHelper):
         )
     
     @staticmethod
-    async def add_game_handler(data, args: list):
-        """Add game tag."""
-        try:
-            if not args:
-                await data.message.reply("Usage: `!gamesbot add GAME`")
-                return
-            
-            game = " ".join(args).lower()
-            member = data.guild.get_member(data.message.author.id) if data.guild else None
+    async def parse_args(data, args: list, usage: str):
+        """Parse optional `-p USER` from args. Returns (member, game) or None after replying."""
+        if not data.guild:
+            await data.message.reply("Could not find server information.")
+            return None
+        if args and args[0] == "-p":
+            if len(args) < 3:
+                await data.message.reply(usage)
+                return None
+            member = await GamesBot.parse_guild_user(data.guild, args[1])
+            if not member:
+                await data.message.reply(f"Could not find user `{args[1]}`.")
+                return None
+            game = " ".join(args[2:]).lower()
+        else:
+            member = data.guild.get_member(data.message.author.id)
             if not member:
                 await data.message.reply("Could not find member information.")
+                return None
+            game = " ".join(args).lower()
+        return member, game
+
+    @staticmethod
+    async def add_game_handler(data, args: list):
+        """Add game tag. Supports `-p USER GAME` to target another user."""
+        try:
+            usage = "Usage: `!gamesbot add [-p USER] GAME`"
+            if not args:
+                await data.message.reply(usage)
                 return
+            
+            target = await GamesBot.parse_args(data, args, usage)
+            if not target:
+                return
+            member, game = target
             
             await GamesBot.add_game(data, member, game)
             await data.message.reply(f"`{member.display_name}` has been added to `{game}`")
@@ -125,17 +148,17 @@ class GamesBot(PluginInterface, PluginHelper):
     
     @staticmethod
     async def remove_game_handler(data, args: list):
-        """Remove game tag."""
+        """Remove game tag. Supports `-p USER GAME` to target another user."""
         try:
+            usage = "Usage: `!gamesbot remove [-p USER] GAME`"
             if not args:
-                await data.message.reply("Usage: `!gamesbot remove GAME`")
+                await data.message.reply(usage)
                 return
             
-            game = " ".join(args).lower()
-            member = data.guild.get_member(data.message.author.id) if data.guild else None
-            if not member:
-                await data.message.reply("Could not find member information.")
+            target = await GamesBot.parse_args(data, args, usage)
+            if not target:
                 return
+            member, game = target
             
             await GamesBot.remove_game(data, member, game)
             await data.message.reply(f"`{member.display_name}` has been removed from `{game}`")
